@@ -1,0 +1,144 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+    .hole-input {
+        width: 50px;
+        text-align: center;
+        margin: 2px;
+        padding: 4px;
+        font-size: 14px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+    }
+
+    .score-entry-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 20px 0;
+    }
+
+    .score-entry-table th,
+    .score-entry-table td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: center;
+    }
+
+    .score-entry-table th {
+        background-color: #f2f2f2;
+    }
+
+    .secure-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+        text-align: center;
+    }
+
+    .security-indicator {
+        display: inline-block;
+        background-color: #28a745;
+        color: white;
+        padding: 5px 10px;
+        border-radius: 15px;
+        font-size: 12px;
+        margin-left: 10px;
+    }
+
+    .nav-buttons {
+        margin-top: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .nav-buttons .button {
+        text-decoration: none;
+        color: white;
+        padding: 10px 20px;
+        border-radius: 5px;
+        font-weight: bold;
+        cursor: pointer;
+        border: none;
+    }
+
+    .button.home {
+        background-color: #6c757d;
+    }
+
+    .button.home:hover {
+        background-color: #5a6268;
+    }
+
+    .button.next {
+        background-color: #007bff;
+    }
+
+    .button.next:hover {
+        background-color: #0056b3;
+    }
+    
+    .button.finish {
+        background-color: #28a745;
+    }
+
+    .button.finish:hover {
+        background-color: #218838;
+    }
+
+    .totals {
+        font-size: 0.9em;
+        color: #666;
+    }
+</style>
+
+<div class="secure-header">
+    <h2>🔒 Secure Score Entry - Hole {{ hole_number }} <span class="security-indicator">SECURE</span></h2>
+    <h3>{{ group.name }} - {{ group.tournament_name }}</h3>
+</div>
+
+<form method="post">
+    <table class="score-entry-table">
+        <thead>
+            <tr>
+                <th>Member Name</th>
+                <th>Score for Hole {{ hole_number }}</th>
+                <th>Front 9 Total</th>
+                <th>Back 9 Total</th>
+                <th>Running Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for member in group_members %}
+            <tr>
+                <td>{{ member.name }}</td>
+                <td>
+                    <input class="hole-input" type="number" name="scores" min="1" max="15" required value="{{ scores[member.id] or '' }}">
+                    <input type="hidden" name="member_ids" value="{{ member.id }}">
+                </td>
+                <td class="totals">{{ front9_totals[member.id] }}</td>
+                <td class="totals">{{ back9_totals[member.id] }}</td>
+                <td class="totals">{{ running_totals[member.id] }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="nav-buttons">
+        <a href="{{ url_for('secure_group_score_entry', token=token) }}" class="button home">🏠 Back to Group Home</a>
+        <div>
+            {% if hole_number > 1 %}
+                <button type="submit" name="action" value="previous" class="button next">← Previous Hole</button>
+            {% endif %}
+            {% if hole_number < 18 %}
+                <button type="submit" name="action" value="next" class="button next">Next Hole →</button>
+            {% else %}
+                <button type="submit" name="action" value="finish" class="button finish">Finish and View Scores</button>
+            {% endif %}
+        </div>
+    </div>
+</form>
+{% endblock %}

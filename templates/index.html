@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <h2>Welcome to the Tournament Management System</h2>
+    <p>This application allows you to manage golf tournament members and their scores.</p>
+    
+    <div style="margin-top: 30px;">
+        <h3>Features:</h3>
+        <ul>
+            <li><strong>Members:</strong> Add and view golf club members with their handicaps and gross win status</li>
+            <li><strong>Tournaments:</strong> Record tournament scores for members</li>
+        </ul>
+    </div>
+    
+    <div style="margin-top: 30px;">
+        <h3>Quick Links:</h3>
+        <p>
+            <a href="/members" style="display: inline-block; background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-right: 10px;">Manage Members</a>
+            <a href="/tournaments" style="display: inline-block; background-color: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Manage Tournaments</a>
+        </p>
+    </div>
+{% endblock %}

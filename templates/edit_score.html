@@ -1,0 +1,150 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <style>
+        .hole-input {
+            width: 35px;
+            text-align: center;
+            margin: 1px;
+            padding: 2px;
+            font-size: 12px;
+        }
+
+        .scorecard-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+        }
+
+        .scorecard-table th,
+        .scorecard-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: center;
+        }
+
+        .scorecard-table th {
+            background-color: #f2f2f2;
+        }
+    </style>
+
+    <h2>Edit Score</h2>
+    
+    <form method="post">
+        <h3>Update Score Information</h3>
+        <div>
+            <label for="member_id">Member:</label>
+            <select id="member_id" name="member_id" required>
+                {% for member in members %}
+                    <option value="{{ member.id }}" {{ "selected" if member.id == score.member_id else "" }}>
+                        {{ member.name }} (Handicap: {{ member.handicap|int }})
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <h4>Edit scores for each hole:</h4>
+        
+        <h5>Front 9</h5>
+        <table class="scorecard-table">
+            <thead>
+                <tr>
+                    <th>Hole</th>
+                    {% for i in range(1, 10) %}
+                    <th>{{ i }}</th>
+                    {% endfor %}
+                    <th>Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Score</strong></td>
+                    {% for i in range(1, 10) %}
+                    <td>
+                        <input type="number" name="hole{{ i }}" class="hole-input" min="1" max="15" 
+                               value="{{ score['hole' ~ i] or '' }}" required onchange="calculateTotals()">
+                    </td>
+                    {% endfor %}
+                    <td><strong id="front9-total">0</strong></td>
+                </tr>
+            </tbody>
+        </table>
+        
+        <h5>Back 9</h5>
+        <table class="scorecard-table">
+            <thead>
+                <tr>
+                    <th>Hole</th>
+                    {% for i in range(10, 19) %}
+                    <th>{{ i }}</th>
+                    {% endfor %}
+                    <th>Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Score</strong></td>
+                    {% for i in range(10, 19) %}
+                    <td>
+                        <input type="number" name="hole{{ i }}" class="hole-input" min="1" max="15" 
+                               value="{{ score['hole' ~ i] or '' }}" required onchange="calculateTotals()">
+                    </td>
+                    {% endfor %}
+                    <td><strong id="back9-total">0</strong></td>
+                </tr>
+            </tbody>
+        </table>
+        
+        <div style="margin-top: 15px; padding: 10px; background-color: #f8f9fa; border-radius: 5px;">
+            <strong>Total Score: <span id="total-score">0</span></strong>
+        </div>
+        
+        <!-- Hidden score field for tiebreakers -->
+        <input type="hidden" name="hidden_score" id="hidden-score" value="0">
+        
+        <div style="margin-top: 15px;">
+            <button type="submit" style="background-color: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin-right: 10px;">Update Score</button>
+            <a href="/tournament/{{ score.tournament_id }}" style="background-color: #6c757d; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Cancel</a>
+        </div>
+    </form>
+    
+    <script>
+        function calculateTotals() {
+            var front9Total = 0;
+            var back9Total = 0;
+
+            // Calculate front 9 total
+            for (var i = 1; i <= 9; i++) {
+                var holeInput = parseInt(document.querySelector(`input[name='hole${i}']`).value) || 0;
+                front9Total += holeInput;
+            }
+            document.getElementById('front9-total').innerText = front9Total;
+
+            // Calculate back 9 total
+            for (var i = 10; i <= 18; i++) {
+                var holeInput = parseInt(document.querySelector(`input[name='hole${i}']`).value) || 0;
+                back9Total += holeInput;
+            }
+            document.getElementById('back9-total').innerText = back9Total;
+
+            // Calculate and display total score
+            var totalScore = front9Total + back9Total;
+            document.getElementById('total-score').innerText = totalScore;
+
+            // Calculate hidden score for tiebreakers
+            var memberSelect = document.getElementById('member_id');
+            var selectedOption = memberSelect.options[memberSelect.selectedIndex];
+            var handicap = parseInt(selectedOption.text.match(/Handicap: (\d+)/)[1]);
+            var totalWithHandicap = totalScore - handicap;
+            var hiddenScore = (totalWithHandicap * 1000000) + (totalScore * 10000) + (back9Total * 100) + front9Total;
+            document.getElementById('hidden-score').value = hiddenScore;
+        }
+        
+        // Calculate totals when page loads
+        window.onload = function() {
+            calculateTotals();
+            // Add event listener for member selection change
+            document.getElementById('member_id').addEventListener('change', calculateTotals);
+        }
+    </script>
+{% endblock %}

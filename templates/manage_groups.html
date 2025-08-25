@@ -1,0 +1,271 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <style>
+        .secure-link-display {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 10px;
+            margin-top: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            word-break: break-all;
+        }
+        
+        .copy-button {
+            background-color: #6f42c1;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 11px;
+            margin-left: 10px;
+        }
+        
+        .copy-button:hover {
+            background-color: #5a2d91;
+        }
+        
+        .secure-section {
+            margin-top: 15px;
+            padding: 15px;
+            background-color: #fff3cd;
+            border: 1px solid #ffeeba;
+            border-radius: 5px;
+        }
+        
+        .secure-section h4 {
+            margin-top: 0;
+            color: #856404;
+        }
+        
+        .group-row {
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .group-row:last-child {
+            border-bottom: none;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+        }
+        
+        th, td {
+            border: 1px solid #dee2e6;
+            padding: 12px;
+            text-align: left;
+        }
+        
+        th {
+            background-color: #f8f9fa;
+        }
+    </style>
+
+    <h2>Manage Groups - {{ tournament.name }}</h2>
+    
+    <div style="margin-bottom: 20px;">
+        <a href="/tournament/{{ tournament.id }}" style="background-color: #6c757d; color: white; padding: 8px 15px; text-decoration: none; border-radius: 5px; display: inline-block;">← Back to Tournament</a>
+        <button onclick="printGroupList()" style="background-color: #17a2b8; color: white; padding: 8px 15px; border: none; border-radius: 5px; cursor: pointer; display: inline-block; margin-left: 10px;">🖨️ Print Group List</button>
+    </div>
+    
+    <form method="post" action="/tournament/{{ tournament.id }}/groups/add">
+        <h3>Create New Group</h3>
+        <div>
+            <input type="text" name="group_name" placeholder="Group Name" required>
+            <button type="submit">Create Group</button>
+        </div>
+    </form>
+
+    <form method="post" action="/tournament/{{ tournament.id }}/groups/set_staggered_tee_times">
+        <h3>Set Staggered Tee Times</h3>
+        <div>
+            <label for="start_time">Start Time:</label>
+            <input type="time" id="start_time" name="start_time" required>
+            
+            <label for="stagger_minutes" style="margin-left: 15px;">Stagger (minutes):</label>
+            <input type="number" id="stagger_minutes" name="stagger_minutes" min="1" value="10" required>
+            
+            <button type="submit" style="margin-left: 15px;">Apply to All Groups</button>
+        </div>
+    </form>
+
+    <h3>Tournament Groups</h3>
+    {% if groups %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Group Name</th>
+                    <th>Members</th>
+                    <th>Tee Time</th>
+                    <th>Actions</th>
+                    <th>Secure Score Entry</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for group in groups %}
+                <tr class="group-row">
+                    <td><a href="/group/{{ group.id }}" style="color: #007bff; text-decoration: none;">{{ group.name }}</a></td>
+                    <td>
+                        {% if group.members %}
+                            <ul style="list-style-type: none; padding-left: 0; margin: 0;">
+                                {% for member in group.members %}
+                                    <li>{{ member }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            No members
+                        {% endif %}
+                    </td>
+                    <td>
+                        {{ group.tee_time.strftime('%H:%M') if group.tee_time else 'Not set' }}
+                    </td>
+                    <td>
+                        <a href="/group/{{ group.id }}" style="background-color: #007bff; color: white; padding: 5px 10px; text-decoration: none; border-radius: 3px;">Manage</a>
+                    </td>
+                    <td>
+                        <div style="margin-bottom: 5px;">
+                            <strong>🔒 Secure Group Link:</strong>
+                            <button class="copy-button" onclick="copyToClipboard('{{ request.url_root }}score/{{ group.secure_token }}')">Copy Link</button>
+                        </div>
+                        <div class="secure-link-display" id="link-{{ group.id }}">
+                            {{ request.url_root }}score/{{ group.secure_token }}
+                        </div>
+                        <small style="color: #6c757d;">Share this secure link with {{ group.name }} members only</small>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        <div class="secure-section">
+            <h4>🛡️ Secure Group Links</h4>
+            <p><strong>How it works:</strong> Each group gets a unique, secure URL that only their members should have access to. Group members can use these links to enter their scores without needing admin access.</p>
+            <p><strong>Security:</strong> These links are randomly generated and unique to each group. Only people with the link can access that group's score entry page.</p>
+            <p><strong>Usage:</strong> Copy and share the secure link with each group. Members can bookmark it and use it to enter scores anytime during the tournament.</p>
+        </div>
+    {% else %}
+        <p>No groups created yet. Create a group using the form above.</p>
+    {% endif %}
+
+    <script>
+        function copyToClipboard(text) {
+            if (!navigator.clipboard) {
+                fallbackCopyTextToClipboard(text);
+                return;
+            }
+            navigator.clipboard.writeText(text).then(function() {
+                showSuccess(event.target);
+            }).catch(function(err) {
+                console.error('Async: Could not copy text: ', err);
+                fallbackCopyTextToClipboard(text);
+            });
+        }
+
+        function fallbackCopyTextToClipboard(text) {
+            var textArea = document.createElement("textarea");
+            textArea.value = text;
+            
+            // Avoid scrolling to bottom
+            textArea.style.top = "0";
+            textArea.style.left = "0";
+            textArea.style.position = "fixed";
+
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+
+            try {
+                var successful = document.execCommand('copy');
+                if (successful) {
+                    // We can't get the button from here easily without passing it
+                    // so we'll just alert for the fallback. A better implementation
+                    // would pass the event target. For now, this is fine.
+                    alert('Link copied to clipboard!');
+                } else {
+                    alert('Failed to copy link. Please select and copy manually.');
+                }
+            } catch (err) {
+                console.error('Fallback: Oops, unable to copy', err);
+                alert('Failed to copy link. Please select and copy manually.');
+            }
+
+            document.body.removeChild(textArea);
+        }
+
+        function showSuccess(button) {
+            const originalText = button.textContent;
+            button.textContent = 'Copied!';
+            button.style.backgroundColor = '#28a745';
+            
+            setTimeout(function() {
+                button.textContent = originalText;
+                button.style.backgroundColor = '#6f42c1';
+            }, 2000);
+        }
+    </script>
+
+    <script>
+        function printGroupList() {
+            const cacheBuster = new Date().getTime();
+            fetch(`/tournament/{{ tournament.id }}/groups/printable?v=${cacheBuster}`)
+                .then(response => response.json())
+                .then(groups => {
+                    if (groups.length === 0) {
+                        alert('No groups to print.');
+                        return;
+                    }
+
+                    let printContent = `
+                        <html>
+                        <head>
+                            <title>Group List - {{ tournament.name }}</title>
+                            <style>
+                                body { font-family: sans-serif; font-size: 10px; }
+                                h1 { text-align: center; font-size: 16px; margin-bottom: 10px; }
+                                .group { 
+                                    border: 1px solid #ccc; 
+                                    padding: 8px; 
+                                    margin-bottom: 10px; 
+                                    page-break-inside: avoid;
+                                }
+                                h2 { font-size: 12px; margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 3px; margin-bottom: 5px; }
+                                ul { list-style-type: none; padding-left: 0; margin: 0; }
+                                li { padding: 2px 0; }
+                            </style>
+                        </head>
+                        <body>
+                            <h1>Group List - {{ tournament.name }}</h1>
+                    `;
+
+                    groups.forEach(group => {
+                        printContent += `<div class="group"><h2>${group.name} (${group.tee_time || 'No tee time set'})</h2><ul>`;
+                        if (group.members.length > 0) {
+                            group.members.forEach(member => {
+                                printContent += `<li>${member.name} (HCP: ${member.handicap})</li>`;
+                            });
+                        } else {
+                            printContent += `<li>No members in this group.</li>`;
+                        }
+                        printContent += `</ul><div style="margin-top: 5px;">Notes:</div></div>`;
+                    });
+
+                    printContent += `</body></html>`;
+
+                    const printWindow = window.open('', '_blank');
+                    printWindow.document.write(printContent);
+                    printWindow.document.close();
+                    printWindow.focus();
+                    printWindow.print();
+                })
+                .catch(error => {
+                    console.error('Error fetching printable group list:', error);
+                    alert('Could not fetch group list. Please try again.');
+                });
+        }
+    </script>
+{% endblock %}

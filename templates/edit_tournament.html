@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <h2>Edit Tournament</h2>
+    
+    <form method="post">
+        <h3>Update Tournament Information</h3>
+        <div>
+            <label for="name">Tournament Name:</label>
+            <input type="text" id="name" name="name" value="{{ tournament.name }}" required>
+        </div>
+        <div style="margin-top: 10px;">
+            <label for="date">Date:</label>
+            <input type="date" id="date" name="date" value="{{ tournament.date }}" required>
+        </div>
+        <div style="margin-top: 10px;">
+            <label for="description">Description:</label>
+            <textarea id="description" name="description" rows="3" style="width: 300px;">{{ tournament.description or '' }}</textarea>
+        </div>
+        <div style="margin-top: 15px;">
+            <button type="submit" style="background-color: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin-right: 10px;">Update Tournament</button>
+            <a href="/tournaments" style="background-color: #6c757d; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Cancel</a>
+        </div>
+    </form>
+{% endblock %}

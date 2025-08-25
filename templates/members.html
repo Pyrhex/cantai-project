@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <h2>Members Management</h2>
+    
+    <form method="post">
+        <h3>Add New Member</h3>
+        <div>
+            <input type="text" name="name" placeholder="Member Name" required>
+            <input type="number" step="1" name="handicap" placeholder="Handicap" required>
+            <select name="gender" required style="margin-left: 10px;">
+                <option value="">Select Gender</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+            </select>
+            <label style="margin-left: 10px;">
+                <input type="checkbox" name="gross_win"> Gross Win
+            </label>
+            <button type="submit">Add Member</button>
+        </div>
+    </form>
+
+    <h3>Current Members</h3>
+    {% if members %}
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Gender</th>
+                    <th>Handicap</th>
+                    <th>Gross Win</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for member in members %}
+                <tr>
+                    <td>{{ member.id }}</td>
+                    <td>{{ member.name }}</td>
+                    <td>{{ member.gender or 'Male' }}</td>
+                    <td>{{ member.handicap|int }}</td>
+                    <td>{{ "Yes" if member.gross_win else "No" }}</td>
+                    <td>
+                        <a href="/edit_member/{{ member.id }}" style="background-color: #28a745; color: white; padding: 5px 10px; text-decoration: none; border-radius: 3px; margin-right: 5px;">Edit</a>
+                        <a href="/delete_member/{{ member.id }}" style="background-color: #dc3545; color: white; padding: 5px 10px; text-decoration: none; border-radius: 3px; border: none; outline: none; box-shadow: none; cursor: pointer;" title="Delete" onclick="return confirm('Are you sure you want to delete this member? This will also delete all their tournament scores.');">×</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No members found. Add some members using the form above.</p>
+    {% endif %}
+{% endblock %}

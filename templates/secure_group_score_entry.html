@@ -1,0 +1,170 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <style>
+        .hole-input {
+            width: 40px;
+            text-align: center;
+            margin: 1px;
+            padding: 2px;
+            font-size: 12px;
+        }
+
+        .scorecard-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 5px 0;
+            font-size: 13px;
+        }
+
+        .scorecard-table th,
+        .scorecard-table td {
+            border: 1px solid #ddd;
+            padding: 4px;
+            text-align: center;
+        }
+
+        .scorecard-table th {
+            background-color: #f2f2f2;
+        }
+        
+        .leaderboard-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+        
+        .leaderboard-table th,
+        .leaderboard-table td {
+            border: 1px solid #ddd;
+            padding: 6px;
+            text-align: center;
+        }
+        
+        .leaderboard-table th {
+            background-color: #f2f2f2;
+        }
+        
+        .secure-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .security-indicator {
+            display: inline-block;
+            background-color: #28a745;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+        
+        @media (max-width: 768px) {
+            .hole-input {
+                width: 35px;
+                font-size: 11px;
+            }
+            
+            .scorecard-table th,
+            .scorecard-table td {
+                padding: 2px;
+                font-size: 11px;
+            }
+            
+            .leaderboard-table th,
+            .leaderboard-table td {
+                padding: 4px;
+                font-size: 12px;
+            }
+            
+            .secure-header {
+                padding: 15px;
+            }
+        }
+    </style>
+
+    <div class="secure-header">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h2 style="margin: 0;">🔒 {{ group.name }} - Secure Score Entry <span class="security-indicator">SECURE</span></h2>
+            <button onclick="window.print()" class="no-print" style="background-color: #fff; color: #007bff; padding: 10px 20px; border: 1px solid #007bff; border-radius: 5px; cursor: pointer;">🖨️ Print / Save</button>
+        </div>
+        <h3 style="margin-top: 10px;">Tournament: {{ group.tournament_name }}</h3>
+        <p style="margin-bottom: 0; opacity: 0.9;">This is a secure link for your group only.</p>
+    </div>
+    
+    <div style="background-color: #f8f9fa; border-radius: 5px; padding: 20px; margin-bottom: 30px;">
+        <a href="{{ url_for('secure_group_score_entry_by_hole', token=token, hole_number=1) }}" class="button">Enter or Edit Scores</a>
+    </div>
+    
+    <!-- Group Scores Display -->
+    <div class="printable-area" style="margin-top: 30px;">
+        <h3>Group Scores</h3>
+        
+        {% if existing_scores %}
+            <table class="leaderboard-table">
+                <thead>
+                    <tr>
+                        <th>Position</th>
+                        <th>Member Name</th>
+                        <th>Front 9</th>
+                        <th>Back 9</th>
+                        <th>Gross Total</th>
+                        <th>Handicap</th>
+                        <th>Net Score</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% set calculated_scores = [] %}
+                    {% for score in existing_scores %}
+                        {% if score.total_score and score.handicap %}
+                            {% set net_score = (score.total_score - score.handicap)|int %}
+                            {% set _ = calculated_scores.append((score, net_score)) %}
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% for score, net_score in calculated_scores|sort(attribute='1') %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td>{{ score.name }}</td>
+                        <td>
+                            {% if score.hole1 %}
+                                {{ (score.hole1 or 0) + (score.hole2 or 0) + (score.hole3 or 0) + (score.hole4 or 0) + (score.hole5 or 0) + (score.hole6 or 0) + (score.hole7 or 0) + (score.hole8 or 0) + (score.hole9 or 0) }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if score.hole10 %}
+                                {{ (score.hole10 or 0) + (score.hole11 or 0) + (score.hole12 or 0) + (score.hole13 or 0) + (score.hole14 or 0) + (score.hole15 or 0) + (score.hole16 or 0) + (score.hole17 or 0) + (score.hole18 or 0) }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>{{ score.total_score }}</td>
+                        <td>{{ score.handicap|int }}</td>
+                        <td><strong>{{ net_score }}</strong></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>No scores have been entered for this group yet.</p>
+        {% endif %}
+    </div>
+    
+    <!-- Information Footer -->
+    <div style="margin-top: 40px; padding: 15px; background-color: #e7f3ff; border-left: 4px solid #2196F3; border-radius: 5px;">
+        <h4 style="margin-top: 0; color: #1976D2;">ℹ️ About This Secure Link</h4>
+        <p style="margin-bottom: 0; color: #555;">
+            This secure URL is unique to your group. Only members with this link can enter scores for <strong>{{ group.name }}</strong>. 
+            Keep this link private and share it only with your group members.
+        </p>
+    </div>
+
+{% endblock %}
