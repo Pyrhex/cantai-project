@@ -1028,6 +1028,9 @@ def view_tournament(tournament_id):
     # Create a dictionary for easy template access
     honors_dict = {mention['honor_type']: mention['member_name'] for mention in honorable_mentions}
     honors_balls = {mention['honor_type']: (mention['balls_awarded'] if mention['balls_awarded'] is not None else 0) for mention in honorable_mentions}
+    total_balls_awarded = sum(honors_balls.values()) if honors_balls else 0
+    male_balls_awarded = sum(v for k, v in honors_balls.items() if k.endswith(' Male')) if honors_balls else 0
+    female_balls_awarded = sum(v for k, v in honors_balls.items() if k.endswith(' Female')) if honors_balls else 0
     
     # Calculate automatic awards from leaderboards
     automatic_awards = {}
@@ -1066,7 +1069,7 @@ def view_tournament(tournament_id):
             automatic_awards['BB'] = calculated_net_scores[-2][0]['name']
     
     conn.close()
-    return render_template('view_tournament.html', tournament=tournament, gross_male_scores=gross_male_scores, gross_female_scores=gross_female_scores, net_male_scores=net_male_scores, net_female_scores=net_female_scores, members=members, groups=groups, selected_group_id=selected_group_id, adjustments_log=adjustments_log, honors_dict=honors_dict, honor_types=honor_types, automatic_awards=automatic_awards, honors_balls=honors_balls)
+    return render_template('view_tournament.html', tournament=tournament, gross_male_scores=gross_male_scores, gross_female_scores=gross_female_scores, net_male_scores=net_male_scores, net_female_scores=net_female_scores, members=members, groups=groups, selected_group_id=selected_group_id, adjustments_log=adjustments_log, honors_dict=honors_dict, honor_types=honor_types, automatic_awards=automatic_awards, honors_balls=honors_balls, total_balls_awarded=total_balls_awarded, male_balls_awarded=male_balls_awarded, female_balls_awarded=female_balls_awarded)
 
 @app.route('/tournament/<int:tournament_id>/add_score', methods=['POST'])
 def add_tournament_score(tournament_id):

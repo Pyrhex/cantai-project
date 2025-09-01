@@ -172,6 +172,19 @@
         Groups</a>
 </div>
 
+{% if total_balls_awarded is not none %}
+<div class="no-print" style="margin-bottom: 16px; padding: 12px 14px; border: 1px solid #d1ecf1; background: #e9f7fb; color: #0c5460; border-radius: 8px;">
+    <div style="display:flex; align-items:center; gap:12px; flex-wrap: wrap;">
+        <div><strong>🎯 Total Balls Awarded:</strong> <span id="total-balls-count">{{ total_balls_awarded }}</span></div>
+        <div style="display:inline-flex; gap:8px; margin-left:auto;">
+            <span style="display:inline-block; background:#e7f1ff; color:#0b5ed7; border:1px solid #cfe2ff; border-radius:999px; padding:4px 10px; font-size:12px;">Male: <span id="male-balls-count">{{ male_balls_awarded or 0 }}</span></span>
+            <span style="display:inline-block; background:#fde7f1; color:#c2185b; border:1px solid #f8cfe0; border-radius:999px; padding:4px 10px; font-size:12px;">Female: <span id="female-balls-count">{{ female_balls_awarded or 0 }}</span></span>
+        </div>
+    </div>
+    <div style="color:#6c757d; font-size:12px; margin-top:6px;">Sum of all Honorable Mentions</div>
+</div>
+{% endif %}
+
 <!-- Gender toggle tabs (page-wide scope) -->
 <div class="gender-toggle no-print" role="tablist" aria-label="Gender filter (applies to entire page)">
     <div class="gender-segment">
@@ -1053,12 +1066,28 @@
                 fd.append('honor_type', honorType);
                 fd.append('balls', String(balls));
                 fetch('/tournament/{{ tournament.id }}/set_honor_balls', { method: 'POST', body: fd, credentials: 'same-origin' })
-                    .then(function(){ window.scrollTo(0, y); })
+                    .then(function(){ updateBallsCounters(); window.scrollTo(0, y); })
                     .catch(function(){});
             };
             input.addEventListener('change', handler);
             input.addEventListener('blur', handler);
         });
+    }
+
+    function updateBallsCounters() {
+        var inputs = document.querySelectorAll('input.honor-balls-input');
+        var total = 0, male = 0, female = 0;
+        inputs.forEach(function(inp){
+            var v = parseInt(inp.value || '0', 10);
+            if (isNaN(v) || v < 0) v = 0;
+            total += v;
+            var ht = inp.getAttribute('data-honor-type') || '';
+            if (ht.endsWith(' Male')) male += v;
+            else if (ht.endsWith(' Female')) female += v;
+        });
+        var t = document.getElementById('total-balls-count'); if (t) t.textContent = total;
+        var m = document.getElementById('male-balls-count'); if (m) m.textContent = male;
+        var f = document.getElementById('female-balls-count'); if (f) f.textContent = female;
     }
 
     // Handle honorable mention assignment/remove without page jump
@@ -1131,6 +1160,7 @@
                         }
                         // Reattach assign handler to the new form
                         attachHonorAssignHandlers();
+                        updateBallsCounters();
                         window.scrollTo(0, y);
                     })
                     .catch(function(){ /* ignore */ });
