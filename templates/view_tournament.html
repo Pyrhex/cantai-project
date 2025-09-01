@@ -82,6 +82,38 @@
         background-color: #f2f2f2;
     }
 
+    /* Minimal, borderless select for inline honor assignment */
+    .plain-select {
+        max-width: 380px;
+        padding: 4px 2px;
+        border: none;
+        background: transparent;
+        font-size: 12px;
+        outline: none;
+    }
+    .plain-select:focus {
+        outline: none;
+        box-shadow: none;
+    }
+    /* Remove generic form styling for honors table inline forms */
+    table.honors-table form {
+        background: transparent !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        border-radius: 0 !important;
+        border: none !important;
+        box-shadow: none !important;
+        display: inline-block;
+    }
+    table.honors-table select.plain-select {
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        appearance: none;
+        background: transparent;
+        border: none;
+        padding: 2px 0;
+    }
+
 
     @media (max-width: 768px) {
         .hole-input {
@@ -140,6 +172,136 @@
         Groups</a>
 </div>
 
+<!-- Gender toggle tabs (page-wide scope) -->
+<div class="gender-toggle no-print" role="tablist" aria-label="Gender filter (applies to entire page)">
+    <div class="gender-segment">
+        <button class="gender-tablink active" role="tab" aria-pressed="true" onclick="selectGender('Male')" id="defaultGender">Male</button>
+        <button class="gender-tablink" role="tab" aria-pressed="false" onclick="selectGender('Female')">Female</button>
+    </div>
+    <style>
+        .gender-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0;
+            padding: 10px 12px;
+            border: 1px solid #cfe2ff;
+            background: #eef6ff;
+            border-radius: 12px;
+            margin: 10px 0 16px 0;
+        }
+        .gender-segment {
+            display: inline-flex;
+            border: 1px solid #cfe2ff;
+            background: #fff;
+            border-radius: 999px;
+            padding: 2px;
+            overflow: hidden;
+        }
+        .gender-tablink {
+            background: transparent;
+            border: none;
+            padding: 8px 18px;
+            font-weight: 600;
+            color: #0b5ed7;
+            cursor: pointer;
+            border-radius: 999px;
+            transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+        }
+        .gender-tablink:hover { background: #f1f8ff; }
+        .gender-tablink.active {
+            background-color: #0d6efd;
+            color: white;
+            box-shadow: 0 0 0 2px #0d6efd inset, 0 1px 2px rgba(13,110,253,0.25);
+        }
+    </style>
+    <script>
+        // Maintain separate gender state (page-wide)
+    function selectGender(gender) {
+            try { localStorage.setItem('selectedGender', gender); } catch(e) {}
+            // Toggle active state on gender buttons
+            var genderBtns = document.getElementsByClassName('gender-tablink');
+            for (var i = 0; i < genderBtns.length; i++) {
+                genderBtns[i].className = genderBtns[i].className.replace(' active', '');
+                genderBtns[i].setAttribute('aria-pressed', 'false');
+            }
+            // Find the clicked button by text content (simpler than passing event)
+            // Better: set active by checking requested gender
+            for (var i = 0; i < genderBtns.length; i++) {
+                if ((gender === 'Male' && genderBtns[i].textContent.trim() === 'Male') || (gender === 'Female' && genderBtns[i].textContent.trim() === 'Female')) {
+                    genderBtns[i].className += ' active';
+                    genderBtns[i].setAttribute('aria-pressed', 'true');
+                }
+            }
+
+            // Show/hide leaderboard tab buttons based on gender
+            var allTabLinks = document.getElementsByClassName('tablinks');
+            for (var j = 0; j < allTabLinks.length; j++) {
+                var isMale = allTabLinks[j].className.indexOf('gender-male') !== -1;
+                var isFemale = allTabLinks[j].className.indexOf('gender-female') !== -1;
+                if ((gender === 'Male' && isMale) || (gender === 'Female' && isFemale)) {
+                    allTabLinks[j].style.display = 'inline-block';
+                } else {
+                    allTabLinks[j].style.display = 'none';
+                    // Also remove active class if previously active
+                    allTabLinks[j].className = allTabLinks[j].className.replace(' active', '');
+                }
+            }
+
+            // Hide all tab contents, then open default for this gender
+            var allContents = document.getElementsByClassName('tabcontent');
+            for (var k = 0; k < allContents.length; k++) {
+                allContents[k].style.display = 'none';
+            }
+
+            // Show/hide any gender-flagged sections across the page (e.g., honors rows, awards cards)
+            var genderElems = document.querySelectorAll('.gender-male, .gender-female');
+            for (var z = 0; z < genderElems.length; z++) {
+                var el = genderElems[z];
+                // Skip tabcontent here; handled by default tab open below
+                if (el.classList.contains('tabcontent')) continue;
+                var show = (gender === 'Male' && el.classList.contains('gender-male')) || (gender === 'Female' && el.classList.contains('gender-female'));
+                el.style.display = show ? '' : 'none';
+            }
+
+            // Filter member dropdown by gender for Add Score form
+            filterMemberDropdownByGender(gender);
+
+            // Click default tab for selected gender
+            if (gender === 'Male') {
+                var btn = document.getElementById('defaultOpenMale');
+                if (btn) btn.click();
+            } else {
+                var btnF = document.getElementById('defaultOpenFemale');
+                if (btnF) btnF.click();
+            }
+        }
+
+        function filterMemberDropdownByGender(gender) {
+            var formSelector = "form[action='/tournament/{{ tournament.id }}/add_score'] select[name='member_id']";
+            var select = document.querySelector(formSelector);
+            if (!select) return;
+            var opts = select.options;
+            for (var i = 0; i < opts.length; i++) {
+                var opt = opts[i];
+                var og = opt.getAttribute('data-gender');
+                if (!og) { // placeholder
+                    opt.hidden = false;
+                    opt.disabled = false;
+                    continue;
+                }
+                var match = (og === gender);
+                opt.hidden = !match;
+                opt.disabled = !match;
+            }
+            // Reset selection if current selection is disabled/hidden
+            if (select.selectedIndex >= 0 && (select.options[select.selectedIndex].disabled || select.options[select.selectedIndex].hidden)) {
+                select.selectedIndex = 0; // placeholder
+            }
+        }
+    </script>
+</div>
+
 {% if groups %}
 <div style="margin-bottom: 20px; padding: 15px; background-color: #f8f9fa; border-radius: 5px;">
     <h4>Filter by Group:</h4>
@@ -163,10 +325,10 @@
 <form method="post" action="/tournament/{{ tournament.id }}/add_score">
     <h3>Add Score</h3>
     <div>
-        <select name="member_id" required style="margin-bottom: 15px;">
+        <select name="member_id" required style="margin-bottom: 15px; font-size: 16px;">
             <option value="">Select Member</option>
             {% for member in members %}
-            <option value="{{ member.id }}">{{ member.name }} (Handicap: {{ member.handicap|int }})</option>
+            <option value="{{ member.id }}" data-gender="{{ member.gender }}">{{ member.name }} (Handicap: {{ member.handicap|int }})</option>
             {% endfor %}
         </select>
     </div>
@@ -233,14 +395,19 @@
 {% endif %}
 
 <div class="tab no-print">
-    <button class="tablinks" onclick="showLeaderboard(event, 'NetMale')" id="defaultOpen">Net Male</button>
-    <button class="tablinks" onclick="showLeaderboard(event, 'NetFemale')">Net Female</button>
-    <button class="tablinks" onclick="showLeaderboard(event, 'GrossMale')">Gross Male</button>
-    <button class="tablinks" onclick="showLeaderboard(event, 'GrossFemale')">Gross Female</button>
+    <button class="tablinks gender-male" onclick="showLeaderboard(event, 'NetMale')" id="defaultOpenMale">Net Male</button>
+    <button class="tablinks gender-female" onclick="showLeaderboard(event, 'NetFemale')" id="defaultOpenFemale">Net Female</button>
+    <button class="tablinks gender-male" onclick="showLeaderboard(event, 'GrossMale')">Gross Male</button>
+    <button class="tablinks gender-female" onclick="showLeaderboard(event, 'GrossFemale')">Gross Female</button>
+    <script>
+        // Ensure only the selected gender's tablinks are visible on load
+        // Initialized in the bottom script by calling selectGender('Male')
+    </script>
+    
 </div>
 
 <div class="printable-area">
-    <div id="GrossMale" class="tabcontent">
+    <div id="GrossMale" class="tabcontent gender-male">
         <h3>Gross Leaderboard - Male</h3>
         <p><em>Note: Members with previous gross wins are excluded from this leaderboard.</em></p>
         {% if gross_male_scores %}
@@ -304,7 +471,7 @@
         {% endif %}
     </div>
 
-    <div id="GrossFemale" class="tabcontent">
+    <div id="GrossFemale" class="tabcontent gender-female">
         <h3>Gross Leaderboard - Female</h3>
         <p><em>Note: Members with previous gross wins are excluded from this leaderboard.</em></p>
         {% if gross_female_scores %}
@@ -368,7 +535,7 @@
         {% endif %}
     </div>
 
-    <div id="NetMale" class="tabcontent">
+    <div id="NetMale" class="tabcontent gender-male">
         <h3>Net Leaderboard - Male (with Handicap)</h3>
         {% if net_male_scores %}
         <table class="leaderboard-table">
@@ -442,7 +609,7 @@
         {% endif %}
     </div>
 
-    <div id="NetFemale" class="tabcontent">
+    <div id="NetFemale" class="tabcontent gender-female">
         <h3>Net Leaderboard - Female (with Handicap)</h3>
         {% if net_female_scores %}
         <table class="leaderboard-table">
@@ -549,56 +716,101 @@
 <div style="margin-top: 40px; margin-bottom: 40px;">
     <h3>Honorable Mentions</h3>
 
-    <div
-        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; align-items: start;">
-        {% for honor_type in honor_types %}
-        <div style="background-color: #d4edda; border-radius: 5px; padding: 10px; border: 2px solid #28a745;">
-            <div id="honor-view-{{ honor_type.id }}"
-                style="display: flex; align-items: center; justify-content: space-between;">
-                <h5 style="margin: 0 0 10px 0; color: #155724; flex-grow: 1;">{{ honor_type.custom_name }}</h5>
-                {% if not tournament.finalized %}
-                <button onclick="toggleHonorEdit('{{ honor_type.id }}')"
-                    style="background: none; border: none; cursor: pointer; font-size: 16px;">✏️</button>
-                {% endif %}
-            </div>
+    <table class="honors-table">
+        <thead>
+            <tr>
+                <th style="width: 45%;">Honor</th>
+                <th>Winner</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for honor_type in honor_types %}
+            <tr>
+                <td style="vertical-align: top;">
+                    <div id="honor-view-{{ honor_type.id }}" style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-weight: 600; color:#155724;">{{ honor_type.custom_name }}</span>
+                        {% if not tournament.finalized %}
+                        <button onclick="toggleHonorEdit('{{ honor_type.id }}')" style="background: #f1f8f3; color: #155724; border: 1px solid #cde8d6; border-radius: 4px; cursor: pointer; font-size: 12px; padding: 2px 6px;">Rename</button>
+                        {% endif %}
+                    </div>
+                    {% if not tournament.finalized %}
+                    <form id="honor-edit-{{ honor_type.id }}" method="post" action="/tournament/{{ tournament.id }}/edit_honor_title" style="display: none; margin-top:6px;">
+                        <input type="hidden" name="honor_type_id" value="{{ honor_type.id }}">
+                        <input type="text" name="custom_name" value="{{ honor_type.custom_name }}" placeholder="Enter title" style="width:100%; max-width: 380px; padding: 6px 8px; border: 1px solid #cfe3d7; border-radius: 6px; font-size: 13px;">
+                    </form>
+                    {% endif %}
+                </td>
+                <td style="vertical-align: top;">
+                    <!-- Male row -->
+                    <div class="gender-male" style="margin-bottom: 8px;">
+                        <span style="display:inline-block; min-width: 60px; color:#495057;">Male:</span>
+                        <span id="honor-cell-{{ honor_type.id }}-male">
+                        {% set male_key = honor_type.original_honor_type ~ ' Male' %}
+                        {% if honors_dict.get(male_key) %}
+                            <span id="honor-winner-{{ honor_type.id }}-male">{{ honors_dict[male_key] }}</span>
+                            <span style="margin-left:10px; color:#495057;">Balls:</span>
+                            <input type="number" min="0" step="1" class="honor-balls-input" data-honor-type="{{ male_key }}" value="{{ honors_balls.get(male_key, 0) }}" style="width: 64px; padding: 4px 6px; border: 1px solid #dde5ee; border-radius: 6px; font-size: 14px; margin-left:6px;">
+                            {% if not tournament.finalized %}
+                            <form id="honor-remove-{{ honor_type.id }}-male" method="post" action="/tournament/{{ tournament.id }}/remove_honor" style="display:inline-block; margin-left:8px;">
+                                <input type="hidden" name="honor_type" value="{{ male_key }}">
+                                <button type="submit" style="background:#f8d7da; color:#842029; border:1px solid #f5c2c7; border-radius:4px; padding:2px 8px; font-size:12px; cursor:pointer;">Remove</button>
+                            </form>
+                            {% endif %}
+                        {% else %}
+                            {% if not tournament.finalized %}
+                            <form id="honor-assign-{{ honor_type.id }}-male" method="post" action="/tournament/{{ tournament.id }}/add_honor" style="display:inline-block;">
+                                <input type="hidden" name="honor_type" value="{{ male_key }}">
+                                <select name="member_id" required style="max-width: 380px; padding: 6px; border: 1px solid #dde5ee; border-radius: 6px; font-size: 16px;">
+                                    <option value="">Select Member</option>
+                                    {% for member in members if member.gender == 'Male' %}
+                                    <option value="{{ member.id }}">{{ member.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </form>
+                            {% else %}
+                            <span style="color: #6c757d; font-style: italic;">Not awarded</span>
+                            {% endif %}
+                        {% endif %}
+                        </span>
+                    </div>
 
-            {% if not tournament.finalized %}
-            <form id="honor-edit-{{ honor_type.id }}" method="post"
-                action="/tournament/{{ tournament.id }}/edit_honor_title" style="display: none; align-items: center;">
-                <input type="hidden" name="honor_type_id" value="{{ honor_type.id }}">
-                <input type="text" name="custom_name" value="{{ honor_type.custom_name }}"
-                    style="flex-grow: 1; padding: 6px; border: 1px solid #ddd; border-radius: 3px;"
-                    onblur="this.form.submit()">
-            </form>
-            {% endif %}
-
-            {% if honors_dict.get(honor_type.original_honor_type) %}
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span style="font-weight: bold; color: #155724;">{{ honors_dict[honor_type.original_honor_type]
-                    }}</span>
-            </div>
-            {% else %}
-            {% if not tournament.finalized %}
-            <form method="post" action="/tournament/{{ tournament.id }}/add_honor"
-                style="display: flex; gap: 5px; align-items: center;">
-                <input type="hidden" name="honor_type" value="{{ honor_type.original_honor_type }}">
-                <select name="member_id" required
-                    style="flex-grow: 1; padding: 2px; border: 1px solid #ddd; border-radius: 3px; font-size: 11px;">
-                    <option value="">Select Member</option>
-                    {% for member in members %}
-                    <option value="{{ member.id }}">{{ member.name }}</option>
-                    {% endfor %}
-                </select>
-                <button type="submit"
-                    style="background-color: #28a745; color: white; padding: 4px 8px; border: none; border-radius: 3px; cursor: pointer; font-size: 12px;">✓</button>
-            </form>
-            {% else %}
-            <span style="color: #6c757d; font-style: italic;">Not awarded</span>
-            {% endif %}
-            {% endif %}
-        </div>
-        {% endfor %}
-    </div>
+                    <!-- Female row -->
+                    <div class="gender-female">
+                        <span style="display:inline-block; min-width: 60px; color:#495057;">Female:</span>
+                        <span id="honor-cell-{{ honor_type.id }}-female">
+                        {% set female_key = honor_type.original_honor_type ~ ' Female' %}
+                        {% if honors_dict.get(female_key) %}
+                            <span id="honor-winner-{{ honor_type.id }}-female">{{ honors_dict[female_key] }}</span>
+                            <span style="margin-left:10px; color:#495057;">Balls:</span>
+                            <input type="number" min="0" step="1" class="honor-balls-input" data-honor-type="{{ female_key }}" value="{{ honors_balls.get(female_key, 0) }}" style="width: 64px; padding: 4px 6px; border: 1px solid #dde5ee; border-radius: 6px; font-size: 14px; margin-left:6px;">
+                            {% if not tournament.finalized %}
+                            <form id="honor-remove-{{ honor_type.id }}-female" method="post" action="/tournament/{{ tournament.id }}/remove_honor" style="display:inline-block; margin-left:8px;">
+                                <input type="hidden" name="honor_type" value="{{ female_key }}">
+                                <button type="submit" style="background:#f8d7da; color:#842029; border:1px solid #f5c2c7; border-radius:4px; padding:2px 8px; font-size:12px; cursor:pointer;">Remove</button>
+                            </form>
+                            {% endif %}
+                        {% else %}
+                            {% if not tournament.finalized %}
+                            <form id="honor-assign-{{ honor_type.id }}-female" method="post" action="/tournament/{{ tournament.id }}/add_honor" style="display:inline-block;">
+                                <input type="hidden" name="honor_type" value="{{ female_key }}">
+                                <select name="member_id" required style="max-width: 380px; padding: 6px; border: 1px solid #dde5ee; border-radius: 6px; font-size: 16px;">
+                                    <option value="">Select Member</option>
+                                    {% for member in members if member.gender == 'Female' %}
+                                    <option value="{{ member.id }}">{{ member.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </form>
+                            {% else %}
+                            <span style="color: #6c757d; font-style: italic;">Not awarded</span>
+                            {% endif %}
+                        {% endif %}
+                        </span>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
 </div>
 
 <!-- Tournament Awards Section -->
@@ -606,17 +818,17 @@
     <h3>Tournament Awards</h3>
 
     {% if automatic_awards %}
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+    <div style="display: flex; flex-direction: column; gap: 15px; align-items: stretch;">
         <!-- Gross Awards -->
         {% if automatic_awards.get('Gross 1st Male') %}
-        <div style="background-color: #fff3cd; border-radius: 5px; padding: 15px; border: 2px solid #ffc107;">
+        <div class="gender-male" style="background-color: #fff3cd; border-radius: 5px; padding: 15px; border: 2px solid #ffc107;">
             <h5 style="margin: 0 0 10px 0; color: #856404;">🏆 Gross 1st - Male</h5>
             <span style="font-weight: bold; color: #856404;">{{ automatic_awards['Gross 1st Male'] }}</span>
         </div>
         {% endif %}
 
         {% if automatic_awards.get('Gross 1st Female') %}
-        <div style="background-color: #fff3cd; border-radius: 5px; padding: 15px; border: 2px solid #ffc107;">
+        <div class="gender-female" style="background-color: #fff3cd; border-radius: 5px; padding: 15px; border: 2px solid #ffc107;">
             <h5 style="margin: 0 0 10px 0; color: #856404;">🏆 Gross 1st - Female</h5>
             <span style="font-weight: bold; color: #856404;">{{ automatic_awards['Gross 1st Female'] }}</span>
         </div>
@@ -717,8 +929,27 @@
         evt.currentTarget.className += " active";
     }
 
-    // Get the element with id="defaultOpen" and click on it
-    document.getElementById("defaultOpen").click();
+    // Pre-rendered options HTML for gendered honors
+    const HONOR_MALE_OPTIONS_HTML = `
+        <option value="">Select Member</option>
+        {% for member in members if member.gender == 'Male' %}
+        <option value="{{ member.id }}">{{ member.name }}</option>
+        {% endfor %}`;
+    const HONOR_FEMALE_OPTIONS_HTML = `
+        <option value="">Select Member</option>
+        {% for member in members if member.gender == 'Female' %}
+        <option value="{{ member.id }}">{{ member.name }}</option>
+        {% endfor %}`;
+
+    // Initialize default view: restore saved gender or default to Male
+    (function(){
+        var saved = 'Male';
+        try {
+            var val = localStorage.getItem('selectedGender');
+            if (val === 'Male' || val === 'Female') saved = val;
+        } catch(e) {}
+        selectGender(saved);
+    })();
 
     function toggleHonorEdit(honorTypeId) {
         const viewDiv = document.getElementById('honor-view-' + honorTypeId);
@@ -731,6 +962,193 @@
             viewDiv.style.display = 'none';
             editForm.style.display = 'flex';
         }
+    }
+
+    // toggleHonorChange no longer used
+
+    function filterHonorMemberOptions(honorTypeId, query) {
+        var select = document.querySelector("select[data-honor-id='" + honorTypeId + "']");
+        if (!select) return;
+        var q = (query || '').toLowerCase();
+        for (var i = 0; i < select.options.length; i++) {
+            var opt = select.options[i];
+            if (!opt.value) { // placeholder
+                opt.hidden = false;
+                opt.disabled = false;
+                continue;
+            }
+            var text = opt.text.toLowerCase();
+            var match = text.indexOf(q) !== -1;
+            opt.hidden = !match;
+            opt.disabled = !match;
+        }
+        // If current selection is filtered out, reset to placeholder
+        if (select.selectedIndex >= 0 && (select.options[select.selectedIndex].disabled || select.options[select.selectedIndex].hidden)) {
+            select.selectedIndex = 0;
+        }
+    }
+
+    // Prevent page jump on honor rename: intercept edit form via fetch and update in place
+    function attachHonorEditHandlers() {
+        var forms = document.querySelectorAll("form[id^='honor-edit-']");
+        forms.forEach(function(form) {
+            var input = form.querySelector("input[name='custom_name']");
+            if (input) {
+                // Remove any inline onblur and handle ourselves
+                input.removeAttribute('onblur');
+                input.addEventListener('keydown', function(e){
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        input.blur();
+                    }
+                });
+                input.addEventListener('blur', function(){
+                    saveHonorTitle(form);
+                });
+            }
+            // Fallback: if form is submitted by other means, intercept
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                saveHonorTitle(form);
+            });
+        });
+    }
+
+    function saveHonorTitle(form) {
+        var y = window.scrollY;
+        var formData = new FormData(form);
+        var honorId = formData.get('honor_type_id');
+        var newName = formData.get('custom_name');
+        fetch(form.action, { method: 'POST', body: formData, credentials: 'same-origin' })
+            .then(function(){
+                var titleEl = document.querySelector('#honor-view-' + honorId + ' h5');
+                if (titleEl) titleEl.textContent = newName;
+                // Toggle back to view
+                form.style.display = 'none';
+                var viewDiv = document.getElementById('honor-view-' + honorId);
+                if (viewDiv) viewDiv.style.display = 'flex';
+                // Restore scroll position
+                window.scrollTo(0, y);
+            })
+            .catch(function(){ /* ignore errors for now */ });
+    }
+
+    // Attach handlers after DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', attachHonorEditHandlers);
+    } else {
+        attachHonorEditHandlers();
+    }
+
+    // Inline save for balls input
+    function attachHonorBallsHandlers() {
+        var inputs = document.querySelectorAll('input.honor-balls-input');
+        inputs.forEach(function(input){
+            var handler = function(){
+                var y = window.scrollY;
+                var honorType = input.getAttribute('data-honor-type');
+                var balls = parseInt(input.value || '0', 10);
+                if (isNaN(balls) || balls < 0) balls = 0;
+                var fd = new FormData();
+                fd.append('honor_type', honorType);
+                fd.append('balls', String(balls));
+                fetch('/tournament/{{ tournament.id }}/set_honor_balls', { method: 'POST', body: fd, credentials: 'same-origin' })
+                    .then(function(){ window.scrollTo(0, y); })
+                    .catch(function(){});
+            };
+            input.addEventListener('change', handler);
+            input.addEventListener('blur', handler);
+        });
+    }
+
+    // Handle honorable mention assignment/remove without page jump
+    function attachHonorAssignHandlers() {
+        // For assign forms
+        var assignForms = document.querySelectorAll("form[id^='honor-assign-']");
+        assignForms.forEach(function(form){
+            var select = form.querySelector("select[name='member_id']");
+            if (!select) return;
+            select.addEventListener('change', function(){
+                if (!select.value) return;
+                var y = window.scrollY;
+                var formData = new FormData(form);
+                var honorId = form.id.replace('honor-assign-','');
+                var selectedText = select.options[select.selectedIndex].text;
+                fetch(form.action, { method: 'POST', body: formData, credentials: 'same-origin' })
+                    .then(function(){
+                        // Replace cell content with winner + balls input + remove controls
+                        var cell = document.getElementById('honor-cell-' + honorId);
+                        if (cell) {
+                            var honorTypeVal = form.querySelector('input[name=honor_type]').value;
+                            cell.innerHTML = `
+                                <span id="honor-winner-${honorId}">${selectedText}</span>
+                                <span style="margin-left:10px; color:#495057;">Balls:</span>
+                                <input type="number" min="0" step="1" class="honor-balls-input" data-honor-type="${honorTypeVal}" value="0" style="width: 64px; padding: 4px 6px; border: 1px solid #dde5ee; border-radius: 6px; font-size: 14px; margin-left:6px;">
+                                <form id="honor-remove-${honorId}" method="post" action="/tournament/{{ tournament.id }}/remove_honor" style="display:inline-block; margin-left:8px;">
+                                    <input type="hidden" name="honor_type" value="${honorTypeVal}">
+                                    <button type="submit" style="background:#f8d7da; color:#842029; border:1px solid #f5c2c7; border-radius:4px; padding:2px 8px; font-size:12px; cursor:pointer;">Remove</button>
+                                </form>`;
+                        }
+                        // Attach remove handlers for the new form
+                        attachHonorRemoveHandlers();
+                        attachHonorBallsHandlers();
+                        window.scrollTo(0, y);
+                    })
+                    .catch(function(){ /* ignore */ });
+            });
+        });
+    }
+
+    // Attach assign/change handlers after DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', attachHonorAssignHandlers);
+    } else {
+        attachHonorAssignHandlers();
+    }
+
+    // Remove handlers for assigned honors
+    function attachHonorRemoveHandlers() {
+        var removeForms = document.querySelectorAll("form[id^='honor-remove-']");
+        removeForms.forEach(function(form){
+            form.addEventListener('submit', function(e){
+                e.preventDefault();
+                var y = window.scrollY;
+                var honorToken = form.id.replace('honor-remove-','');
+                var formData = new FormData(form);
+                fetch(form.action, { method: 'POST', body: formData, credentials: 'same-origin' })
+                    .then(function(){
+                        // Replace with assign UI again
+                        var cell = document.getElementById('honor-cell-' + honorToken);
+                        if (cell) {
+                            var opts = honorToken.endsWith('-male') ? HONOR_MALE_OPTIONS_HTML : HONOR_FEMALE_OPTIONS_HTML;
+                            cell.innerHTML = `
+                                <form id=\"honor-assign-${honorToken}\" method=\"post\" action=\"/tournament/{{ tournament.id }}/add_honor\">\n\
+                                    <input type=\"hidden\" name=\"honor_type\" value=\"${formData.get('honor_type')}\">\n\
+                                    <select name=\"member_id\" required style=\"max-width: 380px; padding: 6px; border: 1px solid #dde5ee; border-radius: 6px; font-size: 16px;\">\n\
+                                        ${opts}\n\
+                                    </select>\n\
+                                </form>`;
+                        }
+                        // Reattach assign handler to the new form
+                        attachHonorAssignHandlers();
+                        window.scrollTo(0, y);
+                    })
+                    .catch(function(){ /* ignore */ });
+            });
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', attachHonorRemoveHandlers);
+    } else {
+        attachHonorRemoveHandlers();
+    }
+
+    // Attach balls handlers on load
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', attachHonorBallsHandlers);
+    } else {
+        attachHonorBallsHandlers();
     }
 </script>
 {% endblock %}

@@ -25,7 +25,8 @@ def init_db():
             handicap REAL NOT NULL,
             gender TEXT CHECK(gender IN ('Male', 'Female')) DEFAULT 'Male',
             gross_win BOOLEAN DEFAULT 0,
-            tournaments_played INTEGER DEFAULT 0
+            tournaments_played INTEGER DEFAULT 0,
+            points INTEGER DEFAULT 0
         )
     ''')
     
@@ -206,6 +207,7 @@ def init_db():
             member_id INTEGER NOT NULL,
             honor_type TEXT NOT NULL,
             honor_type_name TEXT,
+            balls_awarded INTEGER DEFAULT 0,
             FOREIGN KEY (tournament_id) REFERENCES tournaments (id),
             FOREIGN KEY (member_id) REFERENCES members (id),
             UNIQUE(tournament_id, honor_type)
@@ -213,6 +215,18 @@ def init_db():
     ''')
     try:
         conn.execute("ALTER TABLE honorable_mentions ADD COLUMN honor_type_name TEXT")
+    except sqlite3.OperationalError:
+        # Column already exists
+        pass
+    # Ensure points column exists in members (for older DBs)
+    try:
+        conn.execute("ALTER TABLE members ADD COLUMN points INTEGER DEFAULT 0")
+    except sqlite3.OperationalError:
+        # Column already exists
+        pass
+    # Ensure balls_awarded column exists (for older DBs)
+    try:
+        conn.execute("ALTER TABLE honorable_mentions ADD COLUMN balls_awarded INTEGER DEFAULT 0")
     except sqlite3.OperationalError:
         # Column already exists
         pass
@@ -821,11 +835,12 @@ def members():
         handicap = float(request.form['handicap'])
         gender = request.form['gender']
         gross_win = 1 if 'gross_win' in request.form else 0
+        points = int(request.form.get('points', 0))
         
         conn = get_db_connection()
         conn.execute(
-            'INSERT INTO members (name, handicap, gender, gross_win) VALUES (?, ?, ?, ?)',
-            (name, handicap, gender, gross_win)
+            'INSERT INTO members (name, handicap, gender, gross_win, points) VALUES (?, ?, ?, ?, ?)',
+            (name, handicap, gender, gross_win, points)
         )
         conn.commit()
         conn.close()
@@ -1004,7 +1019,7 @@ def view_tournament(tournament_id):
 
     # Get awarded honorable mentions
     honorable_mentions = conn.execute('''
-        SELECT hm.honor_type, m.name as member_name
+        SELECT hm.honor_type, m.name as member_name, hm.balls_awarded
         FROM honorable_mentions hm
         JOIN members m ON hm.member_id = m.id
         WHERE hm.tournament_id = ?
@@ -1012,6 +1027,7 @@ def view_tournament(tournament_id):
     
     # Create a dictionary for easy template access
     honors_dict = {mention['honor_type']: mention['member_name'] for mention in honorable_mentions}
+    honors_balls = {mention['honor_type']: (mention['balls_awarded'] if mention['balls_awarded'] is not None else 0) for mention in honorable_mentions}
     
     # Calculate automatic awards from leaderboards
     automatic_awards = {}
@@ -1050,7 +1066,7 @@ def view_tournament(tournament_id):
             automatic_awards['BB'] = calculated_net_scores[-2][0]['name']
     
     conn.close()
-    return render_template('view_tournament.html', tournament=tournament, gross_male_scores=gross_male_scores, gross_female_scores=gross_female_scores, net_male_scores=net_male_scores, net_female_scores=net_female_scores, members=members, groups=groups, selected_group_id=selected_group_id, adjustments_log=adjustments_log, honors_dict=honors_dict, honor_types=honor_types, automatic_awards=automatic_awards)
+    return render_template('view_tournament.html', tournament=tournament, gross_male_scores=gross_male_scores, gross_female_scores=gross_female_scores, net_male_scores=net_male_scores, net_female_scores=net_female_scores, members=members, groups=groups, selected_group_id=selected_group_id, adjustments_log=adjustments_log, honors_dict=honors_dict, honor_types=honor_types, automatic_awards=automatic_awards, honors_balls=honors_balls)
 
 @app.route('/tournament/<int:tournament_id>/add_score', methods=['POST'])
 def add_tournament_score(tournament_id):
@@ -1097,6 +1113,7 @@ def edit_member(member_id):
         gender = request.form['gender']
         gross_win = 1 if 'gross_win' in request.form else 0
         tournaments_played = int(request.form['tournaments_played'])
+        points = int(request.form.get('points', 0))
         # Check if the new ID already exists (if it's different from current)
         if new_id != member_id:
             existing = conn.execute('SELECT id FROM members WHERE id = ?', (new_id,)).fetchone()
@@ -1106,8 +1123,8 @@ def edit_member(member_id):
                 return redirect(url_for('members'))
         # Update member with new ID
         conn.execute(
-            'UPDATE members SET id = ?, name = ?, handicap = ?, gender = ?, gross_win = ?, tournaments_played = ? WHERE id = ?',
-            (new_id, name, handicap, gender, gross_win, tournaments_played, member_id)
+            'UPDATE members SET id = ?, name = ?, handicap = ?, gender = ?, gross_win = ?, tournaments_played = ?, points = ? WHERE id = ?',
+            (new_id, name, handicap, gender, gross_win, tournaments_played, points, member_id)
         )
         
         # Update all tournament scores that reference this member
@@ -1150,6 +1167,22 @@ def delete_member(member_id):
     reset_members_autoincrement()
     
     flash('Member deleted.', 'success')
+    return redirect(url_for('members'))
+
+@app.route('/member/<int:member_id>/set_points', methods=['POST'])
+def set_member_points(member_id):
+    try:
+        points = int(request.form.get('points', 0))
+        if points < 0:
+            points = 0
+    except (TypeError, ValueError):
+        points = 0
+
+    conn = get_db_connection()
+    conn.execute('UPDATE members SET points = ? WHERE id = ?', (points, member_id))
+    conn.commit()
+    conn.close()
+    flash('Points updated.', 'success')
     return redirect(url_for('members'))
 
 @app.route('/edit_tournament/<int:tournament_id>', methods=['GET', 'POST'])
@@ -1705,6 +1738,51 @@ def add_honorable_mention(tournament_id):
     
     flash('Honorable mention saved.', 'success')
     return redirect(url_for('view_tournament', tournament_id=tournament_id))
+
+@app.route('/tournament/<int:tournament_id>/remove_honor', methods=['POST'])
+def remove_honorable_mention(tournament_id):
+    honor_type = request.form['honor_type']
+
+    conn = get_db_connection()
+    try:
+        conn.execute(
+            'DELETE FROM honorable_mentions WHERE tournament_id = ? AND honor_type = ?',
+            (tournament_id, honor_type)
+        )
+        conn.commit()
+    except sqlite3.Error as e:
+        print(f"Database error: {e}")
+    finally:
+        conn.close()
+
+    flash('Honorable mention removed.', 'success')
+    return redirect(url_for('view_tournament', tournament_id=tournament_id))
+
+@app.route('/tournament/<int:tournament_id>/set_honor_balls', methods=['POST'])
+def set_honor_balls(tournament_id):
+    honor_type = request.form['honor_type']
+    try:
+        balls = int(request.form.get('balls', 0))
+        if balls < 0:
+            balls = 0
+    except (TypeError, ValueError):
+        balls = 0
+
+    conn = get_db_connection()
+    try:
+        conn.execute(
+            'UPDATE honorable_mentions SET balls_awarded = ? WHERE tournament_id = ? AND honor_type = ?',
+            (balls, tournament_id, honor_type)
+        )
+        conn.commit()
+    except sqlite3.Error as e:
+        print(f"Database error: {e}")
+    finally:
+        conn.close()
+
+    # For fetch-based inline update, return JSON-ish response
+    # We won't import jsonify at top just for this; a minimal response is fine
+    return ('OK', 200)
 
 @app.route('/tournament/<int:tournament_id>/edit_honor_title', methods=['POST'])
 def edit_honor_title(tournament_id):

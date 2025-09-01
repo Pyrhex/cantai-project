@@ -29,6 +29,10 @@
             <input type="number" id="tournaments_played" name="tournaments_played" value="{{ member.tournaments_played }}" min="0" required>
         </div>
         <div style="margin-top: 10px;">
+            <label for="points">Points:</label>
+            <input type="number" id="points" name="points" value="{{ member.points if member.points is not none else 0 }}" min="0">
+        </div>
+        <div style="margin-top: 10px;">
             <label>
                 <input type="checkbox" name="gross_win" {{ "checked" if member.gross_win else "" }}> Gross Win
             </label>
