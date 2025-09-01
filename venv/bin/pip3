@@ -1,4 +1,4 @@
-#!/Users/brian/Documents/Projects/cantai-project/venv/bin/python3
+#!/home/brian/Documents/cantai-project/venv/bin/python3
 # -*- coding: utf-8 -*-
 import re
 import sys

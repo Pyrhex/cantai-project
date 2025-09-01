@@ -1,274 +1,306 @@
 {% extends 'base.html' %}
 
 {% block content %}
-    <style>
-        .tab {
-            overflow: hidden;
-            border: 1px solid #ccc;
-            background-color: #f1f1f1;
-            margin-top: 20px;
-        }
+<style>
+    .tab {
+        overflow: hidden;
+        border: 1px solid #ccc;
+        background-color: #f1f1f1;
+        margin-top: 20px;
+    }
 
-        .tab button {
-            background-color: inherit;
-            float: left;
-            border: none;
-            outline: none;
-            cursor: pointer;
-            padding: 14px 16px;
-            transition: 0.3s;
-            color: #333; /* Darker text for inactive tabs */
-        }
+    .tab button {
+        background-color: inherit;
+        float: left;
+        border: none;
+        outline: none;
+        cursor: pointer;
+        padding: 14px 16px;
+        transition: 0.3s;
+        color: #333;
+        /* Darker text for inactive tabs */
+    }
 
-        .tab button:hover {
-            background-color: #ddd;
-        }
+    .tab button:hover {
+        background-color: #ddd;
+    }
 
-        .tab button.active {
-            background-color: #007bff; /* Reverted to original blue */
-            color: white;
-        }
+    .tab button.active {
+        background-color: #007bff;
+        /* Reverted to original blue */
+        color: white;
+    }
 
-        .tabcontent {
-            display: none;
-            padding: 12px;
-            border: 1px solid #ccc;
-            border-top: none;
-        }
+    .tabcontent {
+        display: none;
+        padding: 12px;
+        border: 1px solid #ccc;
+        border-top: none;
+    }
 
+    .hole-input {
+        width: 40px;
+        text-align: center;
+        margin: 1px;
+        padding: 2px;
+        font-size: 12px;
+    }
+
+    .scorecard-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 5px 0;
+        font-size: 13px;
+    }
+
+    .scorecard-table th,
+    .scorecard-table td {
+        border: 1px solid #ddd;
+        padding: 4px;
+        text-align: center;
+    }
+
+    .scorecard-table th {
+        background-color: #f2f2f2;
+    }
+
+    .leaderboard-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 10px 0;
+        font-size: 14px;
+    }
+
+    .leaderboard-table th,
+    .leaderboard-table td {
+        border: 1px solid #ddd;
+        padding: 6px;
+        text-align: center;
+    }
+
+    .leaderboard-table th {
+        background-color: #f2f2f2;
+    }
+
+
+    @media (max-width: 768px) {
         .hole-input {
-            width: 40px;
-            text-align: center;
-            margin: 1px;
-            padding: 2px;
-            font-size: 12px;
-        }
-
-        .scorecard-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 5px 0;
-            font-size: 13px;
+            width: 35px;
+            font-size: 11px;
         }
 
         .scorecard-table th,
         .scorecard-table td {
-            border: 1px solid #ddd;
-            padding: 4px;
-            text-align: center;
+            padding: 2px;
+            font-size: 11px;
         }
 
-        .scorecard-table th {
-            background-color: #f2f2f2;
-        }
-        
-        .leaderboard-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 10px 0;
-            font-size: 14px;
-        }
-        
         .leaderboard-table th,
         .leaderboard-table td {
-            border: 1px solid #ddd;
-            padding: 6px;
-            text-align: center;
+            padding: 4px;
+            font-size: 12px;
         }
-        
-        .leaderboard-table th {
-            background-color: #f2f2f2;
-        }
-        
-        
-        @media (max-width: 768px) {
-            .hole-input {
-                width: 35px;
-                font-size: 11px;
-            }
-            
-            .scorecard-table th,
-            .scorecard-table td {
-                padding: 2px;
-                font-size: 11px;
-            }
-            
-            .leaderboard-table th,
-            .leaderboard-table td {
-                padding: 4px;
-                font-size: 12px;
-            }
-        }
-    </style>
+    }
+</style>
 
-    <div style="display: flex; justify-content: space-between; align-items: center;">
-        <h2>{{ tournament.name }}</h2>
-        <button onclick="window.print()" class="no-print" style="background-color: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer;">🖨️ Print / Save as PDF</button>
-    </div>
-    <p><strong>Date:</strong> {{ tournament.date }}</p>
-    {% if tournament.description %}
-        <p><strong>Description:</strong> {{ tournament.description }}</p>
-    {% endif %}
-    
-    {% if tournament.finalized %}
-        <div style="margin-bottom: 20px; padding: 15px; background-color: #d4edda; border: 1px solid #c3e6cb; border-radius: 5px; color: #155724;">
-            <strong>✅ Tournament Finalized</strong> - This tournament has been finalized. Handicaps will be adjusted for future tournaments.
-        </div>
-    {% else %}
-        <div style="margin-bottom: 20px; padding: 15px; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px; color: #856404;">
-            <strong>⚠️ Tournament Active</strong> - Scores can still be added or modified. 
-            <a href="/finalize_tournament/{{ tournament.id }}" style="background-color: #dc3545; color: white; padding: 5px 10px; text-decoration: none; border-radius: 3px; margin-left: 10px;" onclick="return confirm('Are you sure you want to finalize this tournament? This will prevent further score changes and trigger handicap adjustments.');">Finalize Tournament</a>
-        </div>
-    {% endif %}
-    
-    <div style="margin-bottom: 20px;">
-        <a href="/tournaments" style="background-color: #6c757d; color: white; padding: 8px 15px; text-decoration: none; border-radius: 5px; margin-right: 10px;">← Back to Tournaments</a>
-        <a href="/tournament/{{ tournament.id }}/groups" style="background-color: #17a2b8; color: white; padding: 8px 15px; text-decoration: none; border-radius: 5px;">Manage Groups</a>
-    </div>
-    
-    {% if groups %}
-    <div style="margin-bottom: 20px; padding: 15px; background-color: #f8f9fa; border-radius: 5px;">
-        <h4>Filter by Group:</h4>
-        <div>
-            <a href="/tournament/{{ tournament.id }}" style="background-color: {{ '#007bff' if not selected_group_id else '#6c757d' }}; color: white; padding: 8px 15px; text-decoration: none; border-radius: 3px; margin-right: 5px;">All Members</a>
-            {% for group in groups %}
-                <a href="/tournament/{{ tournament.id }}?group_id={{ group.id }}" style="background-color: {{ '#007bff' if selected_group_id == group.id else '#6c757d' }}; color: white; padding: 8px 15px; text-decoration: none; border-radius: 3px; margin-right: 5px;">{{ group.name }}</a>
+<div style="display: flex; justify-content: space-between; align-items: center;">
+    <h2>{{ tournament.name }}</h2>
+    <button onclick="window.print()" class="no-print"
+        style="background-color: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer;">🖨️
+        Print / Save as PDF</button>
+</div>
+<p><strong>Date:</strong> {{ tournament.date }}</p>
+{% if tournament.description %}
+<p><strong>Description:</strong> {{ tournament.description }}</p>
+{% endif %}
+
+{% if tournament.finalized %}
+<div
+    style="margin-bottom: 20px; padding: 15px; background-color: #d4edda; border: 1px solid #c3e6cb; border-radius: 5px; color: #155724;">
+    <strong>✅ Tournament Finalized</strong> - This tournament has been finalized. Handicaps will be adjusted for future
+    tournaments.
+</div>
+{% else %}
+<div
+    style="margin-bottom: 20px; padding: 15px; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px; color: #856404;">
+    <strong>⚠️ Tournament Active</strong> - Scores can still be added or modified.
+    <a href="/finalize_tournament/{{ tournament.id }}"
+        style="background-color: #dc3545; color: white; padding: 5px 10px; text-decoration: none; border-radius: 3px; margin-left: 10px;"
+        onclick="return confirm('Are you sure you want to finalize this tournament? This will prevent further score changes and trigger handicap adjustments.');">Finalize
+        Tournament</a>
+</div>
+{% endif %}
+
+<div style="margin-bottom: 20px;">
+    <a href="/tournaments"
+        style="background-color: #6c757d; color: white; padding: 8px 15px; text-decoration: none; border-radius: 5px; margin-right: 10px;">←
+        Back to Tournaments</a>
+    <a href="/tournament/{{ tournament.id }}/groups"
+        style="background-color: #17a2b8; color: white; padding: 8px 15px; text-decoration: none; border-radius: 5px;">Manage
+        Groups</a>
+</div>
+
+{% if groups %}
+<div style="margin-bottom: 20px; padding: 15px; background-color: #f8f9fa; border-radius: 5px;">
+    <h4>Filter by Group:</h4>
+    <select onchange="location = this.value;"
+        style="padding: 8px; border-radius: 5px; border: 1px solid #ccc; width: 100%;">
+        <option value="{{ url_for('view_tournament', tournament_id=tournament.id) }}" {% if not selected_group_id
+            %}selected{% endif %}>
+            All Members
+        </option>
+        {% for group in groups %}
+        <option value="{{ url_for('view_tournament', tournament_id=tournament.id, group_id=group.id) }}" {% if
+            selected_group_id==group.id %}selected{% endif %}>
+            {{ group.name }}: {{ group.members|join(', ') }}
+        </option>
+        {% endfor %}
+    </select>
+</div>
+{% endif %}
+
+{% if not tournament.finalized %}
+<form method="post" action="/tournament/{{ tournament.id }}/add_score">
+    <h3>Add Score</h3>
+    <div>
+        <select name="member_id" required style="margin-bottom: 15px;">
+            <option value="">Select Member</option>
+            {% for member in members %}
+            <option value="{{ member.id }}">{{ member.name }} (Handicap: {{ member.handicap|int }})</option>
             {% endfor %}
-        </div>
+        </select>
     </div>
-    {% endif %}
-    
-    {% if not tournament.finalized %}
-    <form method="post" action="/tournament/{{ tournament.id }}/add_score">
-        <h3>Add Score</h3>
-        <div>
-            <select name="member_id" required style="margin-bottom: 15px;">
-                <option value="">Select Member</option>
-                {% for member in members %}
-                    <option value="{{ member.id }}">{{ member.name }} (Handicap: {{ member.handicap|int }})</option>
+
+    <h4>Enter scores for each hole:</h4>
+
+    <h5>Front 9</h5>
+    <table class="scorecard-table">
+        <thead>
+            <tr>
+                <th>Hole</th>
+                {% for i in range(1, 10) %}
+                <th>{{ i }}</th>
                 {% endfor %}
-            </select>
-        </div>
-        
-        <h4>Enter scores for each hole:</h4>
-        
-        <h5>Front 9</h5>
-        <table class="scorecard-table">
-            <thead>
-                <tr>
-                    <th>Hole</th>
-                    {% for i in range(1, 10) %}
-                    <th>{{ i }}</th>
-                    {% endfor %}
-                    <th>Total</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td><strong>Score</strong></td>
-                    {% for i in range(1, 10) %}
-                    <td><input type="number" name="hole{{ i }}" class="hole-input" min="1" max="15" required onchange="calculateTotals()"></td>
-                    {% endfor %}
-                    <td><strong id="front9-total">0</strong></td>
-                </tr>
-            </tbody>
-        </table>
-        
-        <h5>Back 9</h5>
-        <table class="scorecard-table">
-            <thead>
-                <tr>
-                    <th>Hole</th>
-                    {% for i in range(10, 19) %}
-                    <th>{{ i }}</th>
-                    {% endfor %}
-                    <th>Total</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td><strong>Score</strong></td>
-                    {% for i in range(10, 19) %}
-                    <td><input type="number" name="hole{{ i }}" class="hole-input" min="1" max="15" required onchange="calculateTotals()"></td>
-                    {% endfor %}
-                    <td><strong id="back9-total">0</strong></td>
-                </tr>
-            </tbody>
-        </table>
-        
-        <div style="margin-top: 15px; padding: 10px; background-color: #f8f9fa; border-radius: 5px;">
-            <strong>Total Score: <span id="total-score">0</span></strong>
-        </div>
+                <th>Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>Score</strong></td>
+                {% for i in range(1, 10) %}
+                <td><input type="number" name="hole{{ i }}" class="hole-input" min="1" max="15" required
+                        onchange="calculateTotals()"></td>
+                {% endfor %}
+                <td><strong id="front9-total">0</strong></td>
+            </tr>
+        </tbody>
+    </table>
 
-        <button type="submit" style="margin-top: 15px;">Add Score</button>
-    </form>
-    {% else %}
-    <div style="margin-bottom: 20px; padding: 15px; background-color: #f8f9fa; border-radius: 5px;">
-        <h3>Tournament Finalized</h3>
-        <p>This tournament has been finalized. No new scores can be added.</p>
-    </div>
-    {% endif %}
+    <h5>Back 9</h5>
+    <table class="scorecard-table">
+        <thead>
+            <tr>
+                <th>Hole</th>
+                {% for i in range(10, 19) %}
+                <th>{{ i }}</th>
+                {% endfor %}
+                <th>Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>Score</strong></td>
+                {% for i in range(10, 19) %}
+                <td><input type="number" name="hole{{ i }}" class="hole-input" min="1" max="15" required
+                        onchange="calculateTotals()"></td>
+                {% endfor %}
+                <td><strong id="back9-total">0</strong></td>
+            </tr>
+        </tbody>
+    </table>
 
-    <div class="tab no-print">
-        <button class="tablinks" onclick="showLeaderboard(event, 'NetMale')" id="defaultOpen">Net Male</button>
-        <button class="tablinks" onclick="showLeaderboard(event, 'NetFemale')">Net Female</button>
-        <button class="tablinks" onclick="showLeaderboard(event, 'GrossMale')">Gross Male</button>
-        <button class="tablinks" onclick="showLeaderboard(event, 'GrossFemale')">Gross Female</button>
+    <div style="margin-top: 15px; padding: 10px; background-color: #f8f9fa; border-radius: 5px;">
+        <strong>Total Score: <span id="total-score">0</span></strong>
     </div>
 
-    <div class="printable-area">
-        <div id="GrossMale" class="tabcontent">
+    <button type="submit" style="margin-top: 15px;">Add Score</button>
+</form>
+{% else %}
+<div style="margin-bottom: 20px; padding: 15px; background-color: #f8f9fa; border-radius: 5px;">
+    <h3>Tournament Finalized</h3>
+    <p>This tournament has been finalized. No new scores can be added.</p>
+</div>
+{% endif %}
+
+<div class="tab no-print">
+    <button class="tablinks" onclick="showLeaderboard(event, 'NetMale')" id="defaultOpen">Net Male</button>
+    <button class="tablinks" onclick="showLeaderboard(event, 'NetFemale')">Net Female</button>
+    <button class="tablinks" onclick="showLeaderboard(event, 'GrossMale')">Gross Male</button>
+    <button class="tablinks" onclick="showLeaderboard(event, 'GrossFemale')">Gross Female</button>
+</div>
+
+<div class="printable-area">
+    <div id="GrossMale" class="tabcontent">
         <h3>Gross Leaderboard - Male</h3>
         <p><em>Note: Members with previous gross wins are excluded from this leaderboard.</em></p>
         {% if gross_male_scores %}
-            <table class="leaderboard-table">
-                <thead>
-                    <tr>
-                        <th>Position</th>
-                        <th>Member Name</th>
-                        <th>Front 9</th>
-                        <th>Back 9</th>
-                        <th>Total</th>
-                        {% if not tournament.finalized %}
-                        <th>Actions</th>
+        <table class="leaderboard-table">
+            <thead>
+                <tr>
+                    <th>Position</th>
+                    <th>Member Name</th>
+                    <th>Front 9</th>
+                    <th>Back 9</th>
+                    <th>Total</th>
+                    {% if not tournament.finalized %}
+                    <th>Actions</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for score in gross_male_scores %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ score.name }}</td>
+                    <td>
+                        {% if score.hole1 %}
+                        {{ (score.hole1 or 0) + (score.hole2 or 0) + (score.hole3 or 0) + (score.hole4 or 0) +
+                        (score.hole5 or 0) + (score.hole6 or 0) + (score.hole7 or 0) + (score.hole8 or 0) + (score.hole9
+                        or 0) }}
+                        {% else %}
+                        -
                         {% endif %}
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for score in gross_male_scores %}
-                    <tr>
-                        <td>{{ loop.index }}</td>
-                        <td>{{ score.name }}</td>
-                        <td>
-                            {% if score.hole1 %}
-                                {{ (score.hole1 or 0) + (score.hole2 or 0) + (score.hole3 or 0) + (score.hole4 or 0) + (score.hole5 or 0) + (score.hole6 or 0) + (score.hole7 or 0) + (score.hole8 or 0) + (score.hole9 or 0) }}
-                            {% else %}
-                                -
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if score.hole10 %}
-                                {{ (score.hole10 or 0) + (score.hole11 or 0) + (score.hole12 or 0) + (score.hole13 or 0) + (score.hole14 or 0) + (score.hole15 or 0) + (score.hole16 or 0) + (score.hole17 or 0) + (score.hole18 or 0) }}
-                            {% else %}
-                                -
-                            {% endif %}
-                        </td>
-                        <td>{{ score.total_score or '-' }}</td>
-                        {% if not tournament.finalized %}
-                        <td>
-                            <a href="/edit_score/{{ score.id }}" style="background-color: #28a745; color: white; padding: 5px 10px; text-decoration: none; border-radius: 3px; margin-right: 5px;">Edit</a>
-                            <a href="/delete_score/{{ score.id }}" style="background-color: #dc3545; color: white; padding: 5px 10px; text-decoration: none; border-radius: 3px; border: none; outline: none; box-shadow: none; cursor: pointer;" title="Delete" onclick="return confirm('Are you sure you want to delete this score?');">×</a>
-                        </td>
+                    </td>
+                    <td>
+                        {% if score.hole10 %}
+                        {{ (score.hole10 or 0) + (score.hole11 or 0) + (score.hole12 or 0) + (score.hole13 or 0) +
+                        (score.hole14 or 0) + (score.hole15 or 0) + (score.hole16 or 0) + (score.hole17 or 0) +
+                        (score.hole18 or 0) }}
+                        {% else %}
+                        -
                         {% endif %}
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                    </td>
+                    <td>{{ score.total_score or '-' }}</td>
+                    {% if not tournament.finalized %}
+                    <td>
+                        <a href="/edit_score/{{ score.id }}"
+                            style="background-color: #28a745; color: white; padding: 5px 10px; text-decoration: none; border-radius: 3px; margin-right: 5px;">Edit</a>
+                        <a href="/delete_score/{{ score.id }}"
+                            style="background-color: #dc3545; color: white; padding: 5px 10px; text-decoration: none; border-radius: 3px; border: none; outline: none; box-shadow: none; cursor: pointer;"
+                            title="Delete"
+                            onclick="return confirm('Are you sure you want to delete this score?');">×</a>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
         {% else %}
-            <p>No eligible male scores for gross leaderboard. Add some scores using the form above.</p>
-            {% if not members %}
-                <p><em>Note: You need to add members first before recording scores. <a href="/members">Go to Members page</a></em></p>
-            {% endif %}
+        <p>No eligible male scores for gross leaderboard. Add some scores using the form above.</p>
+        {% if not members %}
+        <p><em>Note: You need to add members first before recording scores. <a href="/members">Go to Members
+                    page</a></em></p>
+        {% endif %}
         {% endif %}
     </div>
 
@@ -276,391 +308,429 @@
         <h3>Gross Leaderboard - Female</h3>
         <p><em>Note: Members with previous gross wins are excluded from this leaderboard.</em></p>
         {% if gross_female_scores %}
-            <table class="leaderboard-table">
-                <thead>
-                    <tr>
-                        <th>Position</th>
-                        <th>Member Name</th>
-                        <th>Front 9</th>
-                        <th>Back 9</th>
-                        <th>Total</th>
-                        {% if not tournament.finalized %}
-                        <th>Actions</th>
+        <table class="leaderboard-table">
+            <thead>
+                <tr>
+                    <th>Position</th>
+                    <th>Member Name</th>
+                    <th>Front 9</th>
+                    <th>Back 9</th>
+                    <th>Total</th>
+                    {% if not tournament.finalized %}
+                    <th>Actions</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for score in gross_female_scores %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ score.name }}</td>
+                    <td>
+                        {% if score.hole1 %}
+                        {{ (score.hole1 or 0) + (score.hole2 or 0) + (score.hole3 or 0) + (score.hole4 or 0) +
+                        (score.hole5 or 0) + (score.hole6 or 0) + (score.hole7 or 0) + (score.hole8 or 0) + (score.hole9
+                        or 0) }}
+                        {% else %}
+                        -
                         {% endif %}
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for score in gross_female_scores %}
-                    <tr>
-                        <td>{{ loop.index }}</td>
-                        <td>{{ score.name }}</td>
-                        <td>
-                            {% if score.hole1 %}
-                                {{ (score.hole1 or 0) + (score.hole2 or 0) + (score.hole3 or 0) + (score.hole4 or 0) + (score.hole5 or 0) + (score.hole6 or 0) + (score.hole7 or 0) + (score.hole8 or 0) + (score.hole9 or 0) }}
-                            {% else %}
-                                -
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if score.hole10 %}
-                                {{ (score.hole10 or 0) + (score.hole11 or 0) + (score.hole12 or 0) + (score.hole13 or 0) + (score.hole14 or 0) + (score.hole15 or 0) + (score.hole16 or 0) + (score.hole17 or 0) + (score.hole18 or 0) }}
-                            {% else %}
-                                -
-                            {% endif %}
-                        </td>
-                        <td>{{ score.total_score or '-' }}</td>
-                        {% if not tournament.finalized %}
-                        <td>
-                            <a href="/edit_score/{{ score.id }}" style="background-color: #28a745; color: white; padding: 5px 10px; text-decoration: none; border-radius: 3px; margin-right: 5px;">Edit</a>
-                            <a href="/delete_score/{{ score.id }}" style="background-color: #dc3545; color: white; padding: 5px 10px; text-decoration: none; border-radius: 3px; border: none; outline: none; box-shadow: none; cursor: pointer;" title="Delete" onclick="return confirm('Are you sure you want to delete this score?');">×</a>
-                        </td>
+                    </td>
+                    <td>
+                        {% if score.hole10 %}
+                        {{ (score.hole10 or 0) + (score.hole11 or 0) + (score.hole12 or 0) + (score.hole13 or 0) +
+                        (score.hole14 or 0) + (score.hole15 or 0) + (score.hole16 or 0) + (score.hole17 or 0) +
+                        (score.hole18 or 0) }}
+                        {% else %}
+                        -
                         {% endif %}
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                    </td>
+                    <td>{{ score.total_score or '-' }}</td>
+                    {% if not tournament.finalized %}
+                    <td>
+                        <a href="/edit_score/{{ score.id }}"
+                            style="background-color: #28a745; color: white; padding: 5px 10px; text-decoration: none; border-radius: 3px; margin-right: 5px;">Edit</a>
+                        <a href="/delete_score/{{ score.id }}"
+                            style="background-color: #dc3545; color: white; padding: 5px 10px; text-decoration: none; border-radius: 3px; border: none; outline: none; box-shadow: none; cursor: pointer;"
+                            title="Delete"
+                            onclick="return confirm('Are you sure you want to delete this score?');">×</a>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
         {% else %}
-            <p>No eligible female scores for gross leaderboard. Add some scores using the form above.</p>
-            {% if not members %}
-                <p><em>Note: You need to add members first before recording scores. <a href="/members">Go to Members page</a></em></p>
-            {% endif %}
+        <p>No eligible female scores for gross leaderboard. Add some scores using the form above.</p>
+        {% if not members %}
+        <p><em>Note: You need to add members first before recording scores. <a href="/members">Go to Members
+                    page</a></em></p>
+        {% endif %}
         {% endif %}
     </div>
 
     <div id="NetMale" class="tabcontent">
         <h3>Net Leaderboard - Male (with Handicap)</h3>
         {% if net_male_scores %}
-            <table class="leaderboard-table">
-                <thead>
-                    <tr>
-                        <th>Position</th>
-                        <th>Member Name</th>
-                        <th>Front 9</th>
-                        <th>Back 9</th>
-                        <th>Gross Total</th>
-                        <th>Handicap</th>
-                        <th>Net Score</th>
-                        {% if not tournament.finalized %}
-                        <th>Actions</th>
+        <table class="leaderboard-table">
+            <thead>
+                <tr>
+                    <th>Position</th>
+                    <th>Member Name</th>
+                    <th>Front 9</th>
+                    <th>Back 9</th>
+                    <th>Gross Total</th>
+                    <th>Handicap</th>
+                    <th>Net Score</th>
+                    {% if not tournament.finalized %}
+                    <th>Actions</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% set calculated_net_scores = [] %}
+                {% for score in net_male_scores %}
+                {% if score.total_score is not none and score.handicap is not none %}
+                {% set _ = calculated_net_scores.append((score, (score.total_score - score.handicap)|int)) %}
+                {% endif %}
+                {% endfor %}
+
+                {% for score, net_score in calculated_net_scores|sort(attribute='1') %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ score.name }}</td>
+                    <td>
+                        {% if score.hole1 %}
+                        {{ (score.hole1 or 0) + (score.hole2 or 0) + (score.hole3 or 0) + (score.hole4 or 0) +
+                        (score.hole5 or 0) + (score.hole6 or 0) + (score.hole7 or 0) + (score.hole8 or 0) + (score.hole9
+                        or 0) }}
+                        {% else %}
+                        -
                         {% endif %}
-                    </tr>
-                </thead>
-                <tbody>
-                    {% set calculated_net_scores = [] %}
-                    {% for score in net_male_scores %}
-                        {% if score.total_score is not none and score.handicap is not none %}
-                            {% set _ = calculated_net_scores.append((score, (score.total_score - score.handicap)|int)) %}
+                    </td>
+                    <td>
+                        {% if score.hole10 %}
+                        {{ (score.hole10 or 0) + (score.hole11 or 0) + (score.hole12 or 0) + (score.hole13 or 0) +
+                        (score.hole14 or 0) + (score.hole15 or 0) + (score.hole16 or 0) + (score.hole17 or 0) +
+                        (score.hole18 or 0) }}
+                        {% else %}
+                        -
                         {% endif %}
-                    {% endfor %}
-                    
-                    {% for score, net_score in calculated_net_scores|sort(attribute='1') %}
-                    <tr>
-                        <td>{{ loop.index }}</td>
-                        <td>{{ score.name }}</td>
-                        <td>
-                            {% if score.hole1 %}
-                                {{ (score.hole1 or 0) + (score.hole2 or 0) + (score.hole3 or 0) + (score.hole4 or 0) + (score.hole5 or 0) + (score.hole6 or 0) + (score.hole7 or 0) + (score.hole8 or 0) + (score.hole9 or 0) }}
-                            {% else %}
-                                -
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if score.hole10 %}
-                                {{ (score.hole10 or 0) + (score.hole11 or 0) + (score.hole12 or 0) + (score.hole13 or 0) + (score.hole14 or 0) + (score.hole15 or 0) + (score.hole16 or 0) + (score.hole17 or 0) + (score.hole18 or 0) }}
-                            {% else %}
-                                -
-                            {% endif %}
-                        </td>
-                        <td>{{ score.total_score }}</td>
-                        <td>{{ score.handicap|int }}</td>
-                        <td><strong>{{ net_score }}</strong></td>
-                        {% if not tournament.finalized %}
-                        <td>
-                            <a href="/edit_score/{{ score.id }}" style="background-color: #28a745; color: white; padding: 5px 10px; text-decoration: none; border-radius: 3px; margin-right: 5px;">Edit</a>
-                            <a href="/delete_score/{{ score.id }}" style="background-color: #dc3545; color: white; padding: 5px 10px; text-decoration: none; border-radius: 3px; border: none; outline: none; box-shadow: none; cursor: pointer;" title="Delete" onclick="return confirm('Are you sure you want to delete this score?');">×</a>
-                        </td>
-                        {% endif %}
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                    </td>
+                    <td>{{ score.total_score }}</td>
+                    <td>{{ score.handicap|int }}</td>
+                    <td><strong>{{ net_score }}</strong></td>
+                    {% if not tournament.finalized %}
+                    <td>
+                        <a href="/edit_score/{{ score.id }}"
+                            style="background-color: #28a745; color: white; padding: 5px 10px; text-decoration: none; border-radius: 3px; margin-right: 5px;">Edit</a>
+                        <a href="/delete_score/{{ score.id }}"
+                            style="background-color: #dc3545; color: white; padding: 5px 10px; text-decoration: none; border-radius: 3px; border: none; outline: none; box-shadow: none; cursor: pointer;"
+                            title="Delete"
+                            onclick="return confirm('Are you sure you want to delete this score?');">×</a>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
         {% else %}
-            <p>No male scores recorded for this tournament yet. Add some scores using the form above.</p>
-            {% if not members %}
-                <p><em>Note: You need to add members first before recording scores. <a href="/members">Go to Members page</a></em></p>
-            {% endif %}
+        <p>No male scores recorded for this tournament yet. Add some scores using the form above.</p>
+        {% if not members %}
+        <p><em>Note: You need to add members first before recording scores. <a href="/members">Go to Members
+                    page</a></em></p>
+        {% endif %}
         {% endif %}
     </div>
 
     <div id="NetFemale" class="tabcontent">
         <h3>Net Leaderboard - Female (with Handicap)</h3>
         {% if net_female_scores %}
-            <table class="leaderboard-table">
-                <thead>
-                    <tr>
-                        <th>Position</th>
-                        <th>Member Name</th>
-                        <th>Front 9</th>
-                        <th>Back 9</th>
-                        <th>Gross Total</th>
-                        <th>Handicap</th>
-                        <th>Net Score</th>
-                        {% if not tournament.finalized %}
-                        <th>Actions</th>
-                        {% endif %}
-                    </tr>
-                </thead>
-                <tbody>
-                    {% set calculated_net_scores = [] %}
-                    {% for score in net_female_scores %}
-                        {% if score.total_score is not none and score.handicap is not none %}
-                            {% set _ = calculated_net_scores.append((score, (score.total_score - score.handicap)|int)) %}
-                        {% endif %}
-                    {% endfor %}
-                    
-                    {% for score, net_score in calculated_net_scores|sort(attribute='1') %}
-                    <tr>
-                        <td>{{ loop.index }}</td>
-                        <td>{{ score.name }}</td>
-                        <td>
-                            {% if score.hole1 %}
-                                {{ (score.hole1 or 0) + (score.hole2 or 0) + (score.hole3 or 0) + (score.hole4 or 0) + (score.hole5 or 0) + (score.hole6 or 0) + (score.hole7 or 0) + (score.hole8 or 0) + (score.hole9 or 0) }}
-                            {% else %}
-                                -
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if score.hole10 %}
-                                {{ (score.hole10 or 0) + (score.hole11 or 0) + (score.hole12 or 0) + (score.hole13 or 0) + (score.hole14 or 0) + (score.hole15 or 0) + (score.hole16 or 0) + (score.hole17 or 0) + (score.hole18 or 0) }}
-                            {% else %}
-                                -
-                            {% endif %}
-                        </td>
-                        <td>{{ score.total_score }}</td>
-                        <td>{{ score.handicap|int }}</td>
-                        <td><strong>{{ net_score }}</strong></td>
-                        {% if not tournament.finalized %}
-                        <td>
-                            <a href="/edit_score/{{ score.id }}" style="background-color: #28a745; color: white; padding: 5px 10px; text-decoration: none; border-radius: 3px; margin-right: 5px;">Edit</a>
-                            <a href="/delete_score/{{ score.id }}" style="background-color: #dc3545; color: white; padding: 5px 10px; text-decoration: none; border-radius: 3px; border: none; outline: none; box-shadow: none; cursor: pointer;" title="Delete" onclick="return confirm('Are you sure you want to delete this score?');">×</a>
-                        </td>
-                        {% endif %}
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        {% else %}
-            <p>No female scores recorded for this tournament yet. Add some scores using the form above.</p>
-            {% if not members %}
-                <p><em>Note: You need to add members first before recording scores. <a href="/members">Go to Members page</a></em></p>
-            {% endif %}
-        {% endif %}
-    </div>
-    </div>
-
-    {% if tournament.finalized and adjustments_log %}
-    <div style="margin-top: 40px; margin-bottom: 40px;">
-        <h3>Handicap Adjustments</h3>
         <table class="leaderboard-table">
             <thead>
                 <tr>
-                    <th>Name</th>
-                    <th>Old Handicap</th>
-                    <th>New Handicap</th>
-                    <th>Adjustment</th>
-                    <th>Reason</th>
+                    <th>Position</th>
+                    <th>Member Name</th>
+                    <th>Front 9</th>
+                    <th>Back 9</th>
+                    <th>Gross Total</th>
+                    <th>Handicap</th>
+                    <th>Net Score</th>
+                    {% if not tournament.finalized %}
+                    <th>Actions</th>
+                    {% endif %}
                 </tr>
             </thead>
             <tbody>
-                {% for adj in adjustments_log %}
+                {% set calculated_net_scores = [] %}
+                {% for score in net_female_scores %}
+                {% if score.total_score is not none and score.handicap is not none %}
+                {% set _ = calculated_net_scores.append((score, (score.total_score - score.handicap)|int)) %}
+                {% endif %}
+                {% endfor %}
+
+                {% for score, net_score in calculated_net_scores|sort(attribute='1') %}
                 <tr>
-                    <td>{{ adj.name }}</td>
-                    <td>{{ adj.old }}</td>
-                    <td>{{ adj.new }}</td>
-                    <td>{{ adj.adjustment }}</td>
-                    <td>{{ adj.reason }}</td>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ score.name }}</td>
+                    <td>
+                        {% if score.hole1 %}
+                        {{ (score.hole1 or 0) + (score.hole2 or 0) + (score.hole3 or 0) + (score.hole4 or 0) +
+                        (score.hole5 or 0) + (score.hole6 or 0) + (score.hole7 or 0) + (score.hole8 or 0) + (score.hole9
+                        or 0) }}
+                        {% else %}
+                        -
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if score.hole10 %}
+                        {{ (score.hole10 or 0) + (score.hole11 or 0) + (score.hole12 or 0) + (score.hole13 or 0) +
+                        (score.hole14 or 0) + (score.hole15 or 0) + (score.hole16 or 0) + (score.hole17 or 0) +
+                        (score.hole18 or 0) }}
+                        {% else %}
+                        -
+                        {% endif %}
+                    </td>
+                    <td>{{ score.total_score }}</td>
+                    <td>{{ score.handicap|int }}</td>
+                    <td><strong>{{ net_score }}</strong></td>
+                    {% if not tournament.finalized %}
+                    <td>
+                        <a href="/edit_score/{{ score.id }}"
+                            style="background-color: #28a745; color: white; padding: 5px 10px; text-decoration: none; border-radius: 3px; margin-right: 5px;">Edit</a>
+                        <a href="/delete_score/{{ score.id }}"
+                            style="background-color: #dc3545; color: white; padding: 5px 10px; text-decoration: none; border-radius: 3px; border: none; outline: none; box-shadow: none; cursor: pointer;"
+                            title="Delete"
+                            onclick="return confirm('Are you sure you want to delete this score?');">×</a>
+                    </td>
+                    {% endif %}
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
-    </div>
-    {% endif %}
-    
-    <!-- Honorable Mentions Section -->
-    <div style="margin-top: 40px; margin-bottom: 40px;">
-        <h3>Honorable Mentions</h3>
-        
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; align-items: start;">
-            {% for honor_type in honor_types %}
-                <div style="background-color: #d4edda; border-radius: 5px; padding: 10px; border: 2px solid #28a745;">
-                    <div id="honor-view-{{ honor_type.id }}" style="display: flex; align-items: center; justify-content: space-between;">
-                        <h5 style="margin: 0 0 10px 0; color: #155724; flex-grow: 1;">{{ honor_type.custom_name }}</h5>
-                        {% if not tournament.finalized %}
-                            <button onclick="toggleHonorEdit('{{ honor_type.id }}')" style="background: none; border: none; cursor: pointer; font-size: 16px;">✏️</button>
-                        {% endif %}
-                    </div>
-
-                    {% if not tournament.finalized %}
-                        <form id="honor-edit-{{ honor_type.id }}" method="post" action="/tournament/{{ tournament.id }}/edit_honor_title" style="display: none; align-items: center;">
-                            <input type="hidden" name="honor_type_id" value="{{ honor_type.id }}">
-                            <input type="text" name="custom_name" value="{{ honor_type.custom_name }}" style="flex-grow: 1; padding: 6px; border: 1px solid #ddd; border-radius: 3px;" onblur="this.form.submit()">
-                        </form>
-                    {% endif %}
-                    
-                    {% if honors_dict.get(honor_type.original_honor_type) %}
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <span style="font-weight: bold; color: #155724;">{{ honors_dict[honor_type.original_honor_type] }}</span>
-                        </div>
-                    {% else %}
-                        {% if not tournament.finalized %}
-                            <form method="post" action="/tournament/{{ tournament.id }}/add_honor" style="display: flex; gap: 5px; align-items: center;">
-                                <input type="hidden" name="honor_type" value="{{ honor_type.original_honor_type }}">
-                                <select name="member_id" required style="flex-grow: 1; padding: 2px; border: 1px solid #ddd; border-radius: 3px; font-size: 11px;">
-                                    <option value="">Select Member</option>
-                                    {% for member in members %}
-                                        <option value="{{ member.id }}">{{ member.name }}</option>
-                                    {% endfor %}
-                                </select>
-                                <button type="submit" style="background-color: #28a745; color: white; padding: 4px 8px; border: none; border-radius: 3px; cursor: pointer; font-size: 12px;">✓</button>
-                            </form>
-                        {% else %}
-                            <span style="color: #6c757d; font-style: italic;">Not awarded</span>
-                        {% endif %}
-                    {% endif %}
-                </div>
-            {% endfor %}
-        </div>
-    </div>
-    
-    <!-- Tournament Awards Section -->
-    <div style="margin-top: 40px; margin-bottom: 40px;">
-        <h3>Tournament Awards</h3>
-        
-        {% if automatic_awards %}
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
-                <!-- Gross Awards -->
-                {% if automatic_awards.get('Gross 1st Male') %}
-                    <div style="background-color: #fff3cd; border-radius: 5px; padding: 15px; border: 2px solid #ffc107;">
-                        <h5 style="margin: 0 0 10px 0; color: #856404;">🏆 Gross 1st - Male</h5>
-                        <span style="font-weight: bold; color: #856404;">{{ automatic_awards['Gross 1st Male'] }}</span>
-                    </div>
-                {% endif %}
-                
-                {% if automatic_awards.get('Gross 1st Female') %}
-                    <div style="background-color: #fff3cd; border-radius: 5px; padding: 15px; border: 2px solid #ffc107;">
-                        <h5 style="margin: 0 0 10px 0; color: #856404;">🏆 Gross 1st - Female</h5>
-                        <span style="font-weight: bold; color: #856404;">{{ automatic_awards['Gross 1st Female'] }}</span>
-                    </div>
-                {% endif %}
-                
-                <!-- Net Awards -->
-                {% if automatic_awards.get('Net 1st') %}
-                    <div style="background-color: #d1ecf1; border-radius: 5px; padding: 15px; border: 2px solid #17a2b8;">
-                        <h5 style="margin: 0 0 10px 0; color: #0c5460;">🥇 Net 1st Place</h5>
-                        <span style="font-weight: bold; color: #0c5460;">{{ automatic_awards['Net 1st'] }}</span>
-                    </div>
-                {% endif %}
-                
-                {% if automatic_awards.get('Net 2nd') %}
-                    <div style="background-color: #d1ecf1; border-radius: 5px; padding: 15px; border: 2px solid #17a2b8;">
-                        <h5 style="margin: 0 0 10px 0; color: #0c5460;">🥈 Net 2nd Place</h5>
-                        <span style="font-weight: bold; color: #0c5460;">{{ automatic_awards['Net 2nd'] }}</span>
-                    </div>
-                {% endif %}
-                
-                {% if automatic_awards.get('Net 3rd') %}
-                    <div style="background-color: #d1ecf1; border-radius: 5px; padding: 15px; border: 2px solid #17a2b8;">
-                        <h5 style="margin: 0 0 10px 0; color: #0c5460;">🥉 Net 3rd Place</h5>
-                        <span style="font-weight: bold; color: #0c5460;">{{ automatic_awards['Net 3rd'] }}</span>
-                    </div>
-                {% endif %}
-                
-                {% if automatic_awards.get('Net 4th') %}
-                    <div style="background-color: #e2e3e5; border-radius: 5px; padding: 15px; border: 2px solid #6c757d;">
-                        <h5 style="margin: 0 0 10px 0; color: #495057;">4️⃣ Net 4th Place</h5>
-                        <span style="font-weight: bold; color: #495057;">{{ automatic_awards['Net 4th'] }}</span>
-                    </div>
-                {% endif %}
-                
-                {% if automatic_awards.get('Net 5th') %}
-                    <div style="background-color: #e2e3e5; border-radius: 5px; padding: 15px; border: 2px solid #6c757d;">
-                        <h5 style="margin: 0 0 10px 0; color: #495057;">5️⃣ Net 5th Place</h5>
-                        <span style="font-weight: bold; color: #495057;">{{ automatic_awards['Net 5th'] }}</span>
-                    </div>
-                {% endif %}
-                
-                <!-- Special Awards -->
-                {% if automatic_awards.get('Lucky 7') %}
-                    <div style="background-color: #d4edda; border-radius: 5px; padding: 15px; border: 2px solid #28a745;">
-                        <h5 style="margin: 0 0 10px 0; color: #155724;">🍀 Lucky 7</h5>
-                        <span style="font-weight: bold; color: #155724;">{{ automatic_awards['Lucky 7'] }}</span>
-                    </div>
-                {% endif %}
-                
-                {% if automatic_awards.get('BB') %}
-                    <div style="background-color: #f8d7da; border-radius: 5px; padding: 15px; border: 2px solid #dc3545;">
-                        <h5 style="margin: 0 0 10px 0; color: #721c24;">🤦 BB (Booby Prize)</h5>
-                        <span style="font-weight: bold; color: #721c24;">{{ automatic_awards['BB'] }}</span>
-                    </div>
-                {% endif %}
-            </div>
         {% else %}
-            <p style="color: #6c757d; font-style: italic;">No tournament awards available yet. Complete some scores to see awards.</p>
+        <p>No female scores recorded for this tournament yet. Add some scores using the form above.</p>
+        {% if not members %}
+        <p><em>Note: You need to add members first before recording scores. <a href="/members">Go to Members
+                    page</a></em></p>
+        {% endif %}
         {% endif %}
     </div>
+</div>
 
-    <script>
-        function calculateTotals() {
-            var front9Total = 0;
-            var back9Total = 0;
+{% if tournament.finalized and adjustments_log %}
+<div style="margin-top: 40px; margin-bottom: 40px;">
+    <h3>Handicap Adjustments</h3>
+    <table class="leaderboard-table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Old Handicap</th>
+                <th>New Handicap</th>
+                <th>Adjustment</th>
+                <th>Reason</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for adj in adjustments_log %}
+            <tr>
+                <td>{{ adj.name }}</td>
+                <td>{{ adj.old }}</td>
+                <td>{{ adj.new }}</td>
+                <td>{{ adj.adjustment }}</td>
+                <td>{{ adj.reason }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
 
-            // Calculate front 9 total
-            for (var i = 1; i <= 9; i++) {
-                var holeInput = parseInt(document.querySelector(`input[name='hole${i}']`).value) || 0;
-                front9Total += holeInput;
-            }
-            document.getElementById('front9-total').innerText = front9Total;
+<!-- Honorable Mentions Section -->
+<div style="margin-top: 40px; margin-bottom: 40px;">
+    <h3>Honorable Mentions</h3>
 
-            // Calculate back 9 total
-            for (var i = 10; i <= 18; i++) {
-                var holeInput = parseInt(document.querySelector(`input[name='hole${i}']`).value) || 0;
-                back9Total += holeInput;
-            }
-            document.getElementById('back9-total').innerText = back9Total;
+    <div
+        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; align-items: start;">
+        {% for honor_type in honor_types %}
+        <div style="background-color: #d4edda; border-radius: 5px; padding: 10px; border: 2px solid #28a745;">
+            <div id="honor-view-{{ honor_type.id }}"
+                style="display: flex; align-items: center; justify-content: space-between;">
+                <h5 style="margin: 0 0 10px 0; color: #155724; flex-grow: 1;">{{ honor_type.custom_name }}</h5>
+                {% if not tournament.finalized %}
+                <button onclick="toggleHonorEdit('{{ honor_type.id }}')"
+                    style="background: none; border: none; cursor: pointer; font-size: 16px;">✏️</button>
+                {% endif %}
+            </div>
 
-            // Calculate and display total score
-            var totalScore = front9Total + back9Total;
-            document.getElementById('total-score').innerText = totalScore;
+            {% if not tournament.finalized %}
+            <form id="honor-edit-{{ honor_type.id }}" method="post"
+                action="/tournament/{{ tournament.id }}/edit_honor_title" style="display: none; align-items: center;">
+                <input type="hidden" name="honor_type_id" value="{{ honor_type.id }}">
+                <input type="text" name="custom_name" value="{{ honor_type.custom_name }}"
+                    style="flex-grow: 1; padding: 6px; border: 1px solid #ddd; border-radius: 3px;"
+                    onblur="this.form.submit()">
+            </form>
+            {% endif %}
+
+            {% if honors_dict.get(honor_type.original_honor_type) %}
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-weight: bold; color: #155724;">{{ honors_dict[honor_type.original_honor_type]
+                    }}</span>
+            </div>
+            {% else %}
+            {% if not tournament.finalized %}
+            <form method="post" action="/tournament/{{ tournament.id }}/add_honor"
+                style="display: flex; gap: 5px; align-items: center;">
+                <input type="hidden" name="honor_type" value="{{ honor_type.original_honor_type }}">
+                <select name="member_id" required
+                    style="flex-grow: 1; padding: 2px; border: 1px solid #ddd; border-radius: 3px; font-size: 11px;">
+                    <option value="">Select Member</option>
+                    {% for member in members %}
+                    <option value="{{ member.id }}">{{ member.name }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit"
+                    style="background-color: #28a745; color: white; padding: 4px 8px; border: none; border-radius: 3px; cursor: pointer; font-size: 12px;">✓</button>
+            </form>
+            {% else %}
+            <span style="color: #6c757d; font-style: italic;">Not awarded</span>
+            {% endif %}
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Tournament Awards Section -->
+<div style="margin-top: 40px; margin-bottom: 40px;">
+    <h3>Tournament Awards</h3>
+
+    {% if automatic_awards %}
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+        <!-- Gross Awards -->
+        {% if automatic_awards.get('Gross 1st Male') %}
+        <div style="background-color: #fff3cd; border-radius: 5px; padding: 15px; border: 2px solid #ffc107;">
+            <h5 style="margin: 0 0 10px 0; color: #856404;">🏆 Gross 1st - Male</h5>
+            <span style="font-weight: bold; color: #856404;">{{ automatic_awards['Gross 1st Male'] }}</span>
+        </div>
+        {% endif %}
+
+        {% if automatic_awards.get('Gross 1st Female') %}
+        <div style="background-color: #fff3cd; border-radius: 5px; padding: 15px; border: 2px solid #ffc107;">
+            <h5 style="margin: 0 0 10px 0; color: #856404;">🏆 Gross 1st - Female</h5>
+            <span style="font-weight: bold; color: #856404;">{{ automatic_awards['Gross 1st Female'] }}</span>
+        </div>
+        {% endif %}
+
+        <!-- Net Awards -->
+        {% if automatic_awards.get('Net 1st') %}
+        <div style="background-color: #d1ecf1; border-radius: 5px; padding: 15px; border: 2px solid #17a2b8;">
+            <h5 style="margin: 0 0 10px 0; color: #0c5460;">🥇 Net 1st Place</h5>
+            <span style="font-weight: bold; color: #0c5460;">{{ automatic_awards['Net 1st'] }}</span>
+        </div>
+        {% endif %}
+
+        {% if automatic_awards.get('Net 2nd') %}
+        <div style="background-color: #d1ecf1; border-radius: 5px; padding: 15px; border: 2px solid #17a2b8;">
+            <h5 style="margin: 0 0 10px 0; color: #0c5460;">🥈 Net 2nd Place</h5>
+            <span style="font-weight: bold; color: #0c5460;">{{ automatic_awards['Net 2nd'] }}</span>
+        </div>
+        {% endif %}
+
+        {% if automatic_awards.get('Net 3rd') %}
+        <div style="background-color: #d1ecf1; border-radius: 5px; padding: 15px; border: 2px solid #17a2b8;">
+            <h5 style="margin: 0 0 10px 0; color: #0c5460;">🥉 Net 3rd Place</h5>
+            <span style="font-weight: bold; color: #0c5460;">{{ automatic_awards['Net 3rd'] }}</span>
+        </div>
+        {% endif %}
+
+        {% if automatic_awards.get('Net 4th') %}
+        <div style="background-color: #e2e3e5; border-radius: 5px; padding: 15px; border: 2px solid #6c757d;">
+            <h5 style="margin: 0 0 10px 0; color: #495057;">4️⃣ Net 4th Place</h5>
+            <span style="font-weight: bold; color: #495057;">{{ automatic_awards['Net 4th'] }}</span>
+        </div>
+        {% endif %}
+
+        {% if automatic_awards.get('Net 5th') %}
+        <div style="background-color: #e2e3e5; border-radius: 5px; padding: 15px; border: 2px solid #6c757d;">
+            <h5 style="margin: 0 0 10px 0; color: #495057;">5️⃣ Net 5th Place</h5>
+            <span style="font-weight: bold; color: #495057;">{{ automatic_awards['Net 5th'] }}</span>
+        </div>
+        {% endif %}
+
+        <!-- Special Awards -->
+        {% if automatic_awards.get('Lucky 7') %}
+        <div style="background-color: #d4edda; border-radius: 5px; padding: 15px; border: 2px solid #28a745;">
+            <h5 style="margin: 0 0 10px 0; color: #155724;">🍀 Lucky 7</h5>
+            <span style="font-weight: bold; color: #155724;">{{ automatic_awards['Lucky 7'] }}</span>
+        </div>
+        {% endif %}
+
+        {% if automatic_awards.get('BB') %}
+        <div style="background-color: #f8d7da; border-radius: 5px; padding: 15px; border: 2px solid #dc3545;">
+            <h5 style="margin: 0 0 10px 0; color: #721c24;">🤦 BB (Booby Prize)</h5>
+            <span style="font-weight: bold; color: #721c24;">{{ automatic_awards['BB'] }}</span>
+        </div>
+        {% endif %}
+    </div>
+    {% else %}
+    <p style="color: #6c757d; font-style: italic;">No tournament awards available yet. Complete some scores to see
+        awards.</p>
+    {% endif %}
+</div>
+
+<script>
+    function calculateTotals() {
+        var front9Total = 0;
+        var back9Total = 0;
+
+        // Calculate front 9 total
+        for (var i = 1; i <= 9; i++) {
+            var holeInput = parseInt(document.querySelector(`input[name='hole${i}']`).value) || 0;
+            front9Total += holeInput;
         }
+        document.getElementById('front9-total').innerText = front9Total;
 
-        function showLeaderboard(evt, leaderboardName) {
-            var i, tabcontent, tablinks;
-            tabcontent = document.getElementsByClassName("tabcontent");
-            for (i = 0; i < tabcontent.length; i++) {
-                tabcontent[i].style.display = "none";
-            }
-            tablinks = document.getElementsByClassName("tablinks");
-            for (i = 0; i < tablinks.length; i++) {
-                tablinks[i].className = tablinks[i].className.replace(" active", "");
-            }
-            document.getElementById(leaderboardName).style.display = "block";
-            evt.currentTarget.className += " active";
+        // Calculate back 9 total
+        for (var i = 10; i <= 18; i++) {
+            var holeInput = parseInt(document.querySelector(`input[name='hole${i}']`).value) || 0;
+            back9Total += holeInput;
         }
+        document.getElementById('back9-total').innerText = back9Total;
 
-        // Get the element with id="defaultOpen" and click on it
-        document.getElementById("defaultOpen").click();
+        // Calculate and display total score
+        var totalScore = front9Total + back9Total;
+        document.getElementById('total-score').innerText = totalScore;
+    }
 
-        function toggleHonorEdit(honorTypeId) {
-            const viewDiv = document.getElementById('honor-view-' + honorTypeId);
-            const editForm = document.getElementById('honor-edit-' + honorTypeId);
-
-            if (viewDiv.style.display === 'none') {
-                viewDiv.style.display = 'flex';
-                editForm.style.display = 'none';
-            } else {
-                viewDiv.style.display = 'none';
-                editForm.style.display = 'flex';
-            }
+    function showLeaderboard(evt, leaderboardName) {
+        var i, tabcontent, tablinks;
+        tabcontent = document.getElementsByClassName("tabcontent");
+        for (i = 0; i < tabcontent.length; i++) {
+            tabcontent[i].style.display = "none";
         }
-    </script>
+        tablinks = document.getElementsByClassName("tablinks");
+        for (i = 0; i < tablinks.length; i++) {
+            tablinks[i].className = tablinks[i].className.replace(" active", "");
+        }
+        document.getElementById(leaderboardName).style.display = "block";
+        evt.currentTarget.className += " active";
+    }
+
+    // Get the element with id="defaultOpen" and click on it
+    document.getElementById("defaultOpen").click();
+
+    function toggleHonorEdit(honorTypeId) {
+        const viewDiv = document.getElementById('honor-view-' + honorTypeId);
+        const editForm = document.getElementById('honor-edit-' + honorTypeId);
+
+        if (viewDiv.style.display === 'none') {
+            viewDiv.style.display = 'flex';
+            editForm.style.display = 'none';
+        } else {
+            viewDiv.style.display = 'none';
+            editForm.style.display = 'flex';
+        }
+    }
+</script>
 {% endblock %}

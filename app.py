@@ -877,11 +877,23 @@ def view_tournament(tournament_id):
         conn.close()
         return redirect(url_for('tournaments'))
     
-    # Get all groups for this tournament
-    groups = conn.execute(
+    # Get all groups for this tournament and their members
+    groups_query = conn.execute(
         'SELECT * FROM groups WHERE tournament_id = ? ORDER BY name',
         (tournament_id,)
     ).fetchall()
+    
+    groups = []
+    for group_row in groups_query:
+        group = dict(group_row)
+        members_in_group = conn.execute('''
+            SELECT m.name FROM members m
+            JOIN group_members gm ON m.id = gm.member_id
+            WHERE gm.group_id = ?
+            ORDER BY m.name
+        ''', (group['id'],)).fetchall()
+        group['members'] = [member['name'] for member in members_in_group]
+        groups.append(group)
     
     # Get tournament scores with member details and all hole scores
     if selected_group_id:
@@ -2006,4 +2018,4 @@ def printable_group_list(tournament_id):
 
 if __name__ == '__main__':
     init_db()
-    app.run(debug=True, host='0.0.0.0', port=5001)
+    app.run(debug=True, host='0.0.0.0', port=5004)
