@@ -383,7 +383,7 @@ def calculate_strokes_adjustment(current_handicap, strokes_under_72):
     # Define handicap adjustment rules for strokes under 72
     handicap_adjustments = {
         "0-9": {
-            1: 0, 2: 1, 3: 1, 4: 1, 5: 2, 6: 2,
+            1: 0, 2: 1, 3: 1, 4: 1, 5: 1, 6: 2,
             7: 2, 8: 2, 9: 2, 10: 3, 11: 3, 12: 3
         },
         "10-15": {
@@ -392,11 +392,11 @@ def calculate_strokes_adjustment(current_handicap, strokes_under_72):
         },
         "16-21": {
             1: 1, 2: 1, 3: 2, 4: 2, 5: 3, 6: 3,
-            7: 4, 8: 4, 9: 4, 10: 5, 11: 6, 12: 6
+            7: 4, 8: 4, 9: 5, 10: 5, 11: 6, 12: 6
         },
         "22-26": {
             1: 1, 2: 2, 3: 2, 4: 3, 5: 4, 6: 4,
-            7: 5, 8: 6, 9: 6, 10: 6, 11: 8, 12: 8
+            7: 5, 8: 6, 9: 6, 10: 7, 11: 8, 12: 8
         },
         "27-32": {
             1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6,
