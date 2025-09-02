@@ -1,2 +1,3 @@
 .aider*
 venv/
+database.db
