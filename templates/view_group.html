@@ -11,7 +11,7 @@
     <form method="post" action="/group/{{ group.id }}/add_member">
         <h3>Add Member to Group</h3>
         <div>
-            <select name="member_id" required>
+            <select name="member_id" required {% if group.tournament_finalized %}disabled title="Disabled after finalization"{% endif %}>
                 <option value="">Select Member</option>
                 {% for member in available_members %}
                     <option value="{{ member.id }}">{{ member.name }} (Handicap: {{ member.handicap|int }}) - Not in any group</option>
@@ -24,7 +24,7 @@
                     </optgroup>
                 {% endif %}
             </select>
-            <button type="submit">Add Member</button>
+            <button type="submit" {% if group.tournament_finalized %}disabled title="Disabled after finalization"{% endif %}>Add Member</button>
         </div>
         {% if other_group_members %}
             <p><small><em>Note: Adding a member from another group will automatically move them from their current group to this group.</em></small></p>

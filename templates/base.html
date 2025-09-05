@@ -156,5 +156,39 @@
         </div>
         {% block content %}{% endblock %}
     </div>
+    <script>
+        (function () {
+            // Key per page + query to keep position distinct per filtered view
+            var key = 'scroll-pos:' + location.pathname + location.search;
+
+            // Restore after load so layout is settled; prefer saved position even if hash exists
+            window.addEventListener('load', function () {
+                try {
+                    var pos = sessionStorage.getItem(key);
+                    if (pos !== null) {
+                        // Use a micro-delay to ensure any flash messages/layout shifts are applied first
+                        setTimeout(function(){ window.scrollTo(0, parseInt(pos, 10) || 0); }, 0);
+                    }
+                } catch (e) { /* ignore */ }
+            });
+
+            // Save on navigation
+            var save = function () {
+                try { sessionStorage.setItem(key, String(window.scrollY || window.pageYOffset || 0)); } catch (e) { }
+            };
+            window.addEventListener('beforeunload', save);
+
+            // Also save proactively on form submit and internal link clicks
+            document.addEventListener('submit', save, true);
+            document.addEventListener('click', function (e) {
+                var a = e.target.closest('a');
+                if (!a) return;
+                // Only same-origin navigations
+                var url;
+                try { url = new URL(a.href, location.href); } catch (err) { return; }
+                if (url.origin === location.origin) save();
+            }, true);
+        })();
+    </script>
 </body>
 </html>

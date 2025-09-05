@@ -2,6 +2,9 @@
 
 {% block content %}
     <h2>Members Management</h2>
+    <div class="no-print" style="margin: 10px 0;">
+        <a href="/admin/recalculate_tournaments_played" onclick="return confirm('Recalculate tournaments played based on finalized tournaments?');" style="display: inline-block; background-color: #6f42c1; color: white; padding: 8px 12px; text-decoration: none; border-radius: 4px;">Recalculate Tournaments Played</a>
+    </div>
     
     <form method="post">
         <h3>Add New Member</h3>

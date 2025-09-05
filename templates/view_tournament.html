@@ -172,6 +172,35 @@
         Groups</a>
 </div>
 
+{% if not tournament.finalized %}
+<!-- Public signup link -->
+<div class="no-print" style="margin: 10px 0 20px 0; padding: 12px; border: 1px solid #cfe2ff; background: #eef6ff; border-radius: 8px;">
+    <div style="display:flex; align-items:center; gap:10px; flex-wrap: wrap;">
+        <strong>📝 Public Signup Link:</strong>
+        <button class="copy-button" onclick="copyToClipboard('{{ request.url_root }}signup/{{ tournament.signup_token }}')" style="background:#6f42c1; color:#fff; padding:6px 10px; border:none; border-radius:6px; cursor:pointer;">Copy Link</button>
+        <span style="font-size: 12px; color:#0b5ed7;">Share with players to sign up</span>
+    </div>
+    <div style="margin-top:6px; font-family: monospace; font-size: 12px; color:#333;">{{ request.url_root }}signup/{{ tournament.signup_token }}</div>
+</div>
+<script>
+    function copyToClipboard(text) {
+        if (!navigator.clipboard) {
+            var textArea = document.createElement('textarea');
+            textArea.value = text; document.body.appendChild(textArea);
+            textArea.select(); document.execCommand('copy');
+            document.body.removeChild(textArea);
+            alert('Link copied to clipboard!');
+            return;
+        }
+        navigator.clipboard.writeText(text).then(function(){
+            alert('Link copied to clipboard!');
+        }).catch(function(){
+            alert('Failed to copy link. Please copy manually.');
+        });
+    }
+;</script>
+{% endif %}
+
 {% if total_balls_awarded is not none %}
 <div class="no-print" style="margin-bottom: 16px; padding: 12px 14px; border: 1px solid #d1ecf1; background: #e9f7fb; color: #0c5460; border-radius: 8px;">
     <div style="display:flex; align-items:center; gap:12px; flex-wrap: wrap;">
@@ -318,7 +347,7 @@
 {% if groups %}
 <div style="margin-bottom: 20px; padding: 15px; background-color: #f8f9fa; border-radius: 5px;">
     <h4>Filter by Group:</h4>
-    <select onchange="location = this.value;"
+    <select onchange="location = this.value;" {% if tournament.finalized %}disabled title="Disabled after finalization"{% endif %}
         style="padding: 8px; border-radius: 5px; border: 1px solid #ccc; width: 100%;">
         <option value="{{ url_for('view_tournament', tournament_id=tournament.id) }}" {% if not selected_group_id
             %}selected{% endif %}>
@@ -335,8 +364,12 @@
 {% endif %}
 
 {% if not tournament.finalized %}
-<form method="post" action="/tournament/{{ tournament.id }}/add_score">
-    <h3>Add Score</h3>
+<form id="add-score-form" method="post" action="/tournament/{{ tournament.id }}/add_score">
+    <h3 id="add-score">Add Score</h3>
+    {# Preserve current group filter when submitting a score so the page stays filtered #}
+    {% if selected_group_id %}
+    <input type="hidden" name="selected_group_id" value="{{ selected_group_id }}">
+    {% endif %}
     <div>
         <select name="member_id" required style="margin-bottom: 15px; font-size: 16px;">
             <option value="">Select Member</option>
@@ -697,6 +730,23 @@
     </div>
 </div>
 
+<!-- Lightweight modal for editing scores inline -->
+<div id="modal-overlay" style="display:none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 9999; align-items: center; justify-content: center;">
+  <div id="modal-content" style="background: #fff; width: min(680px, 92vw); max-height: 88vh; overflow: auto; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
+    <div style="display:flex; align-items:center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid #eee; position: sticky; top: 0; background: #fff; z-index: 1;">
+      <strong>Edit Score</strong>
+      <button id="modal-close" aria-label="Close" style="background:transparent; border:none; font-size: 20px; cursor: pointer;">×</button>
+    </div>
+    <div id="modal-body" style="padding: 16px;"></div>
+  </div>
+  <div id="modal-click-capture" style="position:absolute; inset:0;"></div>
+  <style>
+    /* Ensure form inside modal matches page styles */
+    #modal-body form { background: transparent; margin: 0; }
+    #modal-body table { margin-top: 10px; }
+  </style>
+</div>
+
 {% if tournament.finalized and adjustments_log %}
 <div style="margin-top: 40px; margin-bottom: 40px;">
     <h3>Handicap Adjustments</h3>
@@ -837,6 +887,24 @@
         <div class="gender-male" style="background-color: #fff3cd; border-radius: 5px; padding: 15px; border: 2px solid #ffc107;">
             <h5 style="margin: 0 0 10px 0; color: #856404;">🏆 Gross 1st - Male</h5>
             <span style="font-weight: bold; color: #856404;">{{ automatic_awards['Gross 1st Male'] }}</span>
+            <div style="margin-top:8px; color:#6c757d;">
+                {% if award_prizes and award_prizes.get('Gross 1st Male') %}
+                <div><strong>Prize:</strong> {{ award_prizes['Gross 1st Male'] }}</div>
+                {% endif %}
+                {% if not tournament.finalized %}
+                <form method="post" action="/tournament/{{ tournament.id }}/set_award_prize" style="margin-top:6px;">
+                    <input type="hidden" name="award_key" value="Gross 1st Male">
+                    <input type="text" name="prize" value="{{ award_prizes.get('Gross 1st Male', '') if award_prizes else '' }}" placeholder="e.g. $100" style="padding:6px; border:1px solid #dde5ee; border-radius:6px;">
+                    <button type="submit" style="padding:6px 10px; border-radius:6px; background:#007bff; color:white; border:1px solid #007bff;">Save Prize</button>
+                </form>
+                {% if award_prizes and award_prizes.get('Gross 1st Male') %}
+                <form method="post" action="/tournament/{{ tournament.id }}/clear_award_prize" style="display:inline-block; margin-top:6px;">
+                    <input type="hidden" name="award_key" value="Gross 1st Male">
+                    <button type="submit" style="padding:4px 8px; border-radius:6px; background:#f8d7da; color:#842029; border:1px solid #f5c2c7;">Clear</button>
+                </form>
+                {% endif %}
+                {% endif %}
+            </div>
         </div>
         {% endif %}
 
@@ -844,6 +912,24 @@
         <div class="gender-female" style="background-color: #fff3cd; border-radius: 5px; padding: 15px; border: 2px solid #ffc107;">
             <h5 style="margin: 0 0 10px 0; color: #856404;">🏆 Gross 1st - Female</h5>
             <span style="font-weight: bold; color: #856404;">{{ automatic_awards['Gross 1st Female'] }}</span>
+            <div style="margin-top:8px; color:#6c757d;">
+                {% if award_prizes and award_prizes.get('Gross 1st Female') %}
+                <div><strong>Prize:</strong> {{ award_prizes['Gross 1st Female'] }}</div>
+                {% endif %}
+                {% if not tournament.finalized %}
+                <form method="post" action="/tournament/{{ tournament.id }}/set_award_prize" style="margin-top:6px;">
+                    <input type="hidden" name="award_key" value="Gross 1st Female">
+                    <input type="text" name="prize" value="{{ award_prizes.get('Gross 1st Female', '') if award_prizes else '' }}" placeholder="e.g. $100" style="padding:6px; border:1px solid #dde5ee; border-radius:6px;">
+                    <button type="submit" style="padding:6px 10px; border-radius:6px; background:#007bff; color:white; border:1px solid #007bff;">Save Prize</button>
+                </form>
+                {% if award_prizes and award_prizes.get('Gross 1st Female') %}
+                <form method="post" action="/tournament/{{ tournament.id }}/clear_award_prize" style="display:inline-block; margin-top:6px;">
+                    <input type="hidden" name="award_key" value="Gross 1st Female">
+                    <button type="submit" style="padding:4px 8px; border-radius:6px; background:#f8d7da; color:#842029; border:1px solid #f5c2c7;">Clear</button>
+                </form>
+                {% endif %}
+                {% endif %}
+            </div>
         </div>
         {% endif %}
 
@@ -852,6 +938,24 @@
         <div style="background-color: #d1ecf1; border-radius: 5px; padding: 15px; border: 2px solid #17a2b8;">
             <h5 style="margin: 0 0 10px 0; color: #0c5460;">🥇 Net 1st Place</h5>
             <span style="font-weight: bold; color: #0c5460;">{{ automatic_awards['Net 1st'] }}</span>
+            <div style="margin-top:8px; color:#6c757d;">
+                {% if award_prizes and award_prizes.get('Net 1st') %}
+                <div><strong>Prize:</strong> {{ award_prizes['Net 1st'] }}</div>
+                {% endif %}
+                {% if not tournament.finalized %}
+                <form method="post" action="/tournament/{{ tournament.id }}/set_award_prize" style="margin-top:6px;">
+                    <input type="hidden" name="award_key" value="Net 1st">
+                    <input type="text" name="prize" value="{{ award_prizes.get('Net 1st', '') if award_prizes else '' }}" placeholder="e.g. $80" style="padding:6px; border:1px solid #dde5ee; border-radius:6px;">
+                    <button type="submit" style="padding:6px 10px; border-radius:6px; background:#007bff; color:white; border:1px solid #007bff;">Save Prize</button>
+                </form>
+                {% if award_prizes and award_prizes.get('Net 1st') %}
+                <form method="post" action="/tournament/{{ tournament.id }}/clear_award_prize" style="display:inline-block; margin-top:6px;">
+                    <input type="hidden" name="award_key" value="Net 1st">
+                    <button type="submit" style="padding:4px 8px; border-radius:6px; background:#f8d7da; color:#842029; border:1px solid #f5c2c7;">Clear</button>
+                </form>
+                {% endif %}
+                {% endif %}
+            </div>
         </div>
         {% endif %}
 
@@ -859,6 +963,24 @@
         <div style="background-color: #d1ecf1; border-radius: 5px; padding: 15px; border: 2px solid #17a2b8;">
             <h5 style="margin: 0 0 10px 0; color: #0c5460;">🥈 Net 2nd Place</h5>
             <span style="font-weight: bold; color: #0c5460;">{{ automatic_awards['Net 2nd'] }}</span>
+            <div style="margin-top:8px; color:#6c757d;">
+                {% if award_prizes and award_prizes.get('Net 2nd') %}
+                <div><strong>Prize:</strong> {{ award_prizes['Net 2nd'] }}</div>
+                {% endif %}
+                {% if not tournament.finalized %}
+                <form method="post" action="/tournament/{{ tournament.id }}/set_award_prize" style="margin-top:6px;">
+                    <input type="hidden" name="award_key" value="Net 2nd">
+                    <input type="text" name="prize" value="{{ award_prizes.get('Net 2nd', '') if award_prizes else '' }}" placeholder="e.g. $60" style="padding:6px; border:1px solid #dde5ee; border-radius:6px;">
+                    <button type="submit" style="padding:6px 10px; border-radius:6px; background:#007bff; color:white; border:1px solid #007bff;">Save Prize</button>
+                </form>
+                {% if award_prizes and award_prizes.get('Net 2nd') %}
+                <form method="post" action="/tournament/{{ tournament.id }}/clear_award_prize" style="display:inline-block; margin-top:6px;">
+                    <input type="hidden" name="award_key" value="Net 2nd">
+                    <button type="submit" style="padding:4px 8px; border-radius:6px; background:#f8d7da; color:#842029; border:1px solid #f5c2c7;">Clear</button>
+                </form>
+                {% endif %}
+                {% endif %}
+            </div>
         </div>
         {% endif %}
 
@@ -866,6 +988,24 @@
         <div style="background-color: #d1ecf1; border-radius: 5px; padding: 15px; border: 2px solid #17a2b8;">
             <h5 style="margin: 0 0 10px 0; color: #0c5460;">🥉 Net 3rd Place</h5>
             <span style="font-weight: bold; color: #0c5460;">{{ automatic_awards['Net 3rd'] }}</span>
+            <div style="margin-top:8px; color:#6c757d;">
+                {% if award_prizes and award_prizes.get('Net 3rd') %}
+                <div><strong>Prize:</strong> {{ award_prizes['Net 3rd'] }}</div>
+                {% endif %}
+                {% if not tournament.finalized %}
+                <form method="post" action="/tournament/{{ tournament.id }}/set_award_prize" style="margin-top:6px;">
+                    <input type="hidden" name="award_key" value="Net 3rd">
+                    <input type="text" name="prize" value="{{ award_prizes.get('Net 3rd', '') if award_prizes else '' }}" placeholder="e.g. $40" style="padding:6px; border:1px solid #dde5ee; border-radius:6px;">
+                    <button type="submit" style="padding:6px 10px; border-radius:6px; background:#007bff; color:white; border:1px solid #007bff;">Save Prize</button>
+                </form>
+                {% if award_prizes and award_prizes.get('Net 3rd') %}
+                <form method="post" action="/tournament/{{ tournament.id }}/clear_award_prize" style="display:inline-block; margin-top:6px;">
+                    <input type="hidden" name="award_key" value="Net 3rd">
+                    <button type="submit" style="padding:4px 8px; border-radius:6px; background:#f8d7da; color:#842029; border:1px solid #f5c2c7;">Clear</button>
+                </form>
+                {% endif %}
+                {% endif %}
+            </div>
         </div>
         {% endif %}
 
@@ -873,6 +1013,24 @@
         <div style="background-color: #e2e3e5; border-radius: 5px; padding: 15px; border: 2px solid #6c757d;">
             <h5 style="margin: 0 0 10px 0; color: #495057;">4️⃣ Net 4th Place</h5>
             <span style="font-weight: bold; color: #495057;">{{ automatic_awards['Net 4th'] }}</span>
+            <div style="margin-top:8px; color:#6c757d;">
+                {% if award_prizes and award_prizes.get('Net 4th') %}
+                <div><strong>Prize:</strong> {{ award_prizes['Net 4th'] }}</div>
+                {% endif %}
+                {% if not tournament.finalized %}
+                <form method="post" action="/tournament/{{ tournament.id }}/set_award_prize" style="margin-top:6px;">
+                    <input type="hidden" name="award_key" value="Net 4th">
+                    <input type="text" name="prize" value="{{ award_prizes.get('Net 4th', '') if award_prizes else '' }}" placeholder="e.g. $20" style="padding:6px; border:1px solid #dde5ee; border-radius:6px;">
+                    <button type="submit" style="padding:6px 10px; border-radius:6px; background:#007bff; color:white; border:1px solid #007bff;">Save Prize</button>
+                </form>
+                {% if award_prizes and award_prizes.get('Net 4th') %}
+                <form method="post" action="/tournament/{{ tournament.id }}/clear_award_prize" style="display:inline-block; margin-top:6px;">
+                    <input type="hidden" name="award_key" value="Net 4th">
+                    <button type="submit" style="padding:4px 8px; border-radius:6px; background:#f8d7da; color:#842029; border:1px solid #f5c2c7;">Clear</button>
+                </form>
+                {% endif %}
+                {% endif %}
+            </div>
         </div>
         {% endif %}
 
@@ -880,6 +1038,24 @@
         <div style="background-color: #e2e3e5; border-radius: 5px; padding: 15px; border: 2px solid #6c757d;">
             <h5 style="margin: 0 0 10px 0; color: #495057;">5️⃣ Net 5th Place</h5>
             <span style="font-weight: bold; color: #495057;">{{ automatic_awards['Net 5th'] }}</span>
+            <div style="margin-top:8px; color:#6c757d;">
+                {% if award_prizes and award_prizes.get('Net 5th') %}
+                <div><strong>Prize:</strong> {{ award_prizes['Net 5th'] }}</div>
+                {% endif %}
+                {% if not tournament.finalized %}
+                <form method="post" action="/tournament/{{ tournament.id }}/set_award_prize" style="margin-top:6px;">
+                    <input type="hidden" name="award_key" value="Net 5th">
+                    <input type="text" name="prize" value="{{ award_prizes.get('Net 5th', '') if award_prizes else '' }}" placeholder="e.g. $10" style="padding:6px; border:1px solid #dde5ee; border-radius:6px;">
+                    <button type="submit" style="padding:6px 10px; border-radius:6px; background:#007bff; color:white; border:1px solid #007bff;">Save Prize</button>
+                </form>
+                {% if award_prizes and award_prizes.get('Net 5th') %}
+                <form method="post" action="/tournament/{{ tournament.id }}/clear_award_prize" style="display:inline-block; margin-top:6px;">
+                    <input type="hidden" name="award_key" value="Net 5th">
+                    <button type="submit" style="padding:4px 8px; border-radius:6px; background:#f8d7da; color:#842029; border:1px solid #f5c2c7;">Clear</button>
+                </form>
+                {% endif %}
+                {% endif %}
+            </div>
         </div>
         {% endif %}
 
@@ -888,6 +1064,24 @@
         <div style="background-color: #d4edda; border-radius: 5px; padding: 15px; border: 2px solid #28a745;">
             <h5 style="margin: 0 0 10px 0; color: #155724;">🍀 Lucky 7</h5>
             <span style="font-weight: bold; color: #155724;">{{ automatic_awards['Lucky 7'] }}</span>
+            <div style="margin-top:8px; color:#6c757d;">
+                {% if award_prizes and award_prizes.get('Lucky 7') %}
+                <div><strong>Prize:</strong> {{ award_prizes['Lucky 7'] }}</div>
+                {% endif %}
+                {% if not tournament.finalized %}
+                <form method="post" action="/tournament/{{ tournament.id }}/set_award_prize" style="margin-top:6px;">
+                    <input type="hidden" name="award_key" value="Lucky 7">
+                    <input type="text" name="prize" value="{{ award_prizes.get('Lucky 7', '') if award_prizes else '' }}" placeholder="e.g. $10" style="padding:6px; border:1px solid #dde5ee; border-radius:6px;">
+                    <button type="submit" style="padding:6px 10px; border-radius:6px; background:#007bff; color:white; border:1px solid #007bff;">Save Prize</button>
+                </form>
+                {% if award_prizes and award_prizes.get('Lucky 7') %}
+                <form method="post" action="/tournament/{{ tournament.id }}/clear_award_prize" style="display:inline-block; margin-top:6px;">
+                    <input type="hidden" name="award_key" value="Lucky 7">
+                    <button type="submit" style="padding:4px 8px; border-radius:6px; background:#f8d7da; color:#842029; border:1px solid #f5c2c7;">Clear</button>
+                </form>
+                {% endif %}
+                {% endif %}
+            </div>
         </div>
         {% endif %}
 
@@ -895,6 +1089,24 @@
         <div style="background-color: #f8d7da; border-radius: 5px; padding: 15px; border: 2px solid #dc3545;">
             <h5 style="margin: 0 0 10px 0; color: #721c24;">🤦 BB (Booby Prize)</h5>
             <span style="font-weight: bold; color: #721c24;">{{ automatic_awards['BB'] }}</span>
+            <div style="margin-top:8px; color:#6c757d;">
+                {% if award_prizes and award_prizes.get('BB') %}
+                <div><strong>Prize:</strong> {{ award_prizes['BB'] }}</div>
+                {% endif %}
+                {% if not tournament.finalized %}
+                <form method="post" action="/tournament/{{ tournament.id }}/set_award_prize" style="margin-top:6px;">
+                    <input type="hidden" name="award_key" value="BB">
+                    <input type="text" name="prize" value="{{ award_prizes.get('BB', '') if award_prizes else '' }}" placeholder="e.g. sleeve of balls" style="padding:6px; border:1px solid #dde5ee; border-radius:6px;">
+                    <button type="submit" style="padding:6px 10px; border-radius:6px; background:#007bff; color:white; border:1px solid #007bff;">Save Prize</button>
+                </form>
+                {% if award_prizes and award_prizes.get('BB') %}
+                <form method="post" action="/tournament/{{ tournament.id }}/clear_award_prize" style="display:inline-block; margin-top:6px;">
+                    <input type="hidden" name="award_key" value="BB">
+                    <button type="submit" style="padding:4px 8px; border-radius:6px; background:#f8d7da; color:#842029; border:1px solid #f5c2c7;">Clear</button>
+                </form>
+                {% endif %}
+                {% endif %}
+            </div>
         </div>
         {% endif %}
     </div>
@@ -1180,5 +1392,158 @@
     } else {
         attachHonorBallsHandlers();
     }
+
+    // Seamless Add Score via fetch (avoid full-page reload)
+    function attachAddScoreAjax() {
+        var form = document.getElementById('add-score-form');
+        if (!form) return;
+        form.addEventListener('submit', function(e){
+            e.preventDefault();
+            var y = window.scrollY;
+            var submitBtn = form.querySelector('button[type="submit"]');
+            var oldText = submitBtn ? submitBtn.textContent : '';
+            if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Saving...'; }
+            var fd = new FormData(form);
+            fetch(form.action, { method: 'POST', body: fd, credentials: 'same-origin' })
+                .then(function(res){ return res.text(); })
+                .then(function(html){
+                    // Parse the redirected page and swap relevant sections
+                    var parser = new DOMParser();
+                    var doc = parser.parseFromString(html, 'text/html');
+
+                    // Flash messages
+                    var newFlash = doc.querySelector('.flash-container');
+                    var curFlash = document.querySelector('.flash-container');
+                    if (newFlash && curFlash) curFlash.innerHTML = newFlash.innerHTML;
+
+                    // Leaderboards and awards
+                    var newArea = doc.querySelector('.printable-area');
+                    var curArea = document.querySelector('.printable-area');
+                    if (newArea && curArea) curArea.innerHTML = newArea.innerHTML;
+
+                    // Reattach dynamic handlers for honors after DOM replacement
+                    attachHonorAssignHandlers();
+                    attachHonorRemoveHandlers();
+                    attachHonorBallsHandlers();
+
+                    // Re-apply saved gender selection so the same views stay visible
+                    var saved = 'Male';
+                    try { var v = localStorage.getItem('selectedGender'); if (v === 'Male' || v === 'Female') saved = v; } catch(e) {}
+                    selectGender(saved);
+
+                    // Reset form inputs and totals
+                    try { form.reset(); } catch(e) {}
+                    var f9 = document.getElementById('front9-total'); if (f9) f9.textContent = '0';
+                    var b9 = document.getElementById('back9-total'); if (b9) b9.textContent = '0';
+                    var tt = document.getElementById('total-score'); if (tt) tt.textContent = '0';
+
+                    // Preserve scroll position
+                    window.scrollTo(0, y);
+                })
+                .catch(function(err){
+                    console.error('Add score failed', err);
+                })
+                .finally(function(){
+                    if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = oldText; }
+                });
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', attachAddScoreAjax);
+    } else {
+        attachAddScoreAjax();
+    }
+
+    // Utility: refresh key sections from current filtered page
+    function refreshPageSections(preserveScrollY) {
+        var y = preserveScrollY != null ? preserveScrollY : window.scrollY;
+        return fetch(location.href, { credentials: 'same-origin' })
+            .then(function(res){ return res.text(); })
+            .then(function(html){
+                var doc = new DOMParser().parseFromString(html, 'text/html');
+                var newFlash = doc.querySelector('.flash-container');
+                var curFlash = document.querySelector('.flash-container');
+                if (newFlash && curFlash) curFlash.innerHTML = newFlash.innerHTML;
+                var newArea = doc.querySelector('.printable-area');
+                var curArea = document.querySelector('.printable-area');
+                if (newArea && curArea) curArea.innerHTML = newArea.innerHTML;
+                // Reattach dynamic handlers and restore gender selection
+                attachHonorAssignHandlers();
+                attachHonorRemoveHandlers();
+                attachHonorBallsHandlers();
+                var saved = 'Male';
+                try { var v = localStorage.getItem('selectedGender'); if (v === 'Male' || v === 'Female') saved = v; } catch(e) {}
+                selectGender(saved);
+                window.scrollTo(0, y);
+            });
+    }
+
+    // Seamless Delete Score via fetch (event delegation)
+    document.addEventListener('click', function(e){
+        var a = e.target.closest('a');
+        if (!a) return;
+        var href = a.getAttribute('href') || '';
+        if (!href.startsWith('/delete_score/')) return;
+        e.preventDefault();
+        var ok = confirm('Are you sure you want to delete this score?');
+        if (!ok) return;
+        var y = window.scrollY;
+        fetch(href, { method: 'GET', credentials: 'same-origin' })
+            .then(function(){ return refreshPageSections(y); })
+            .catch(function(err){ console.error('Delete failed', err); });
+    }, true);
+
+    // Modal utilities
+    function openModalWithNode(node) {
+        var overlay = document.getElementById('modal-overlay');
+        var body = document.getElementById('modal-body');
+        body.innerHTML = '';
+        body.appendChild(node);
+        overlay.style.display = 'flex';
+    }
+    function closeModal() {
+        var overlay = document.getElementById('modal-overlay');
+        overlay.style.display = 'none';
+        document.getElementById('modal-body').innerHTML = '';
+    }
+    document.getElementById('modal-close').addEventListener('click', function(){ closeModal(); });
+    document.getElementById('modal-overlay').addEventListener('click', function(e){
+        if (e.target.id === 'modal-overlay' || e.target.id === 'modal-click-capture') closeModal();
+    });
+
+    // Seamless Edit Score via modal + fetch (event delegation)
+    document.addEventListener('click', function(e){
+        var a = e.target.closest('a');
+        if (!a) return;
+        var href = a.getAttribute('href') || '';
+        if (!href.startsWith('/edit_score/')) return;
+        e.preventDefault();
+        var y = window.scrollY;
+        fetch(href, { method: 'GET', credentials: 'same-origin' })
+            .then(function(res){ return res.text(); })
+            .then(function(html){
+                var doc = new DOMParser().parseFromString(html, 'text/html');
+                // Grab the edit form from the returned page
+                var form = doc.querySelector('form');
+                if (!form) return;
+                // Ensure form posts via fetch and preserves current group view
+                var node = document.importNode(form, true);
+                // Attach submit handler on the imported form
+                node.addEventListener('submit', function(ev){
+                    ev.preventDefault();
+                    var fd = new FormData(node);
+                    // Submit edit
+                    fetch(node.action, { method: 'POST', body: fd, credentials: 'same-origin' })
+                        .then(function(){ return refreshPageSections(y); })
+                        .then(function(){ closeModal(); })
+                        .catch(function(err){ console.error('Edit failed', err); });
+                });
+                openModalWithNode(node);
+                // Keep scroll position
+                window.scrollTo(0, y);
+            })
+            .catch(function(err){ console.error('Load edit form failed', err); });
+    }, true);
 </script>
 {% endblock %}

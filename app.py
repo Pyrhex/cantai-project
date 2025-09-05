@@ -243,6 +243,29 @@ def init_db():
             UNIQUE(tournament_id, original_honor_type)
         )
     ''')
+
+    # Create tournament_snapshots table to store finalized page HTML snapshots
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS tournament_snapshots (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tournament_id INTEGER NOT NULL UNIQUE,
+            html TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (tournament_id) REFERENCES tournaments (id)
+        )
+    ''')
+
+    # Create tournament_award_prizes table to store prizes for automatic awards
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS tournament_award_prizes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tournament_id INTEGER NOT NULL,
+            award_key TEXT NOT NULL,
+            prize TEXT,
+            FOREIGN KEY (tournament_id) REFERENCES tournaments (id),
+            UNIQUE(tournament_id, award_key)
+        )
+    ''')
     
     # Ensure secure_token column exists in groups table (migration for older DBs)
     try:
@@ -259,6 +282,25 @@ def init_db():
     except sqlite3.OperationalError:
         # Column already exists
         pass
+
+    # Ensure signup_token column exists in tournaments for public signup links
+    try:
+        conn.execute("ALTER TABLE tournaments ADD COLUMN signup_token TEXT")
+        print("Added signup_token column to tournaments table")
+    except sqlite3.OperationalError:
+        # Column already exists
+        pass
+    # Generate signup tokens for existing tournaments missing one
+    try:
+        tournaments_needing_tokens = conn.execute('SELECT id FROM tournaments WHERE signup_token IS NULL OR signup_token = ""').fetchall()
+        for t in tournaments_needing_tokens:
+            token = str(uuid.uuid4())
+            conn.execute('UPDATE tournaments SET signup_token = ? WHERE id = ?', (token, t['id']))
+            print(f"Generated signup token for tournament {t['id']}: {token}")
+        # Unique index for tokens
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_tournaments_signup_token ON tournaments(signup_token)")
+    except Exception as e:
+        print(f"Error generating signup tokens: {e}")
     
     # Generate secure tokens for existing groups that don't have them
     try:
@@ -277,6 +319,46 @@ def init_db():
     except sqlite3.OperationalError:
         pass
     
+    # Create tournament_signups table for public registration
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS tournament_signups (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tournament_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            need_powercart INTEGER DEFAULT 0,
+            notes TEXT,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (tournament_id) REFERENCES tournaments (id)
+        )
+    ''')
+
+    conn.commit()
+    conn.close()
+    
+def get_tournament_snapshot_html(tournament_id):
+    conn = get_db_connection()
+    row = conn.execute('SELECT html FROM tournament_snapshots WHERE tournament_id = ?', (tournament_id,)).fetchone()
+    conn.close()
+    return row['html'] if row else None
+
+def save_tournament_snapshot(tournament_id):
+    """Render the tournament page and save the full HTML as a snapshot."""
+    # Render the live page content using the same view to capture full HTML
+    # Use a test request context so view_tournament can access request.args
+    with app.test_request_context(f"/tournament/{tournament_id}"):
+        # Call the view directly to generate HTML (no snapshot exists yet at finalize time)
+        rendered = view_tournament(tournament_id)
+        # view_tournament returns a string (rendered template) when successful
+        html = rendered if isinstance(rendered, str) else str(rendered)
+
+    # Store or replace snapshot
+    conn = get_db_connection()
+    now = datetime.utcnow().isoformat()
+    existing = conn.execute('SELECT id FROM tournament_snapshots WHERE tournament_id = ?', (tournament_id,)).fetchone()
+    if existing:
+        conn.execute('UPDATE tournament_snapshots SET html = ?, created_at = ? WHERE tournament_id = ?', (html, now, tournament_id))
+    else:
+        conn.execute('INSERT INTO tournament_snapshots (tournament_id, html, created_at) VALUES (?, ?, ?)', (tournament_id, html, now))
     conn.commit()
     conn.close()
 
@@ -860,12 +942,21 @@ def tournaments():
         name = request.form['name']
         date = request.form['date']
         description = request.form.get('description', '')
-        
+        signup_token = str(uuid.uuid4())
+
         conn = get_db_connection()
-        conn.execute(
-            'INSERT INTO tournaments (name, date, description) VALUES (?, ?, ?)',
-            (name, date, description)
-        )
+        try:
+            # Try inserting with signup_token column
+            conn.execute(
+                'INSERT INTO tournaments (name, date, description, signup_token) VALUES (?, ?, ?, ?)',
+                (name, date, description, signup_token)
+            )
+        except sqlite3.OperationalError:
+            # Fallback for older DBs where column didn't migrate for some reason
+            conn.execute(
+                'INSERT INTO tournaments (name, date, description) VALUES (?, ?, ?)',
+                (name, date, description)
+            )
         conn.commit()
         conn.close()
         flash('Tournament created successfully.', 'success')
@@ -876,6 +967,62 @@ def tournaments():
     tournaments = conn.execute('SELECT * FROM tournaments ORDER BY date DESC').fetchall()
     conn.close()
     return render_template('tournaments.html', tournaments=tournaments)
+
+@app.route('/tournament/<int:tournament_id>/signup')
+def tournament_signup_redirect(tournament_id):
+    """Backward-compatible route that redirects to the tokenized signup URL."""
+    conn = get_db_connection()
+    row = conn.execute('SELECT signup_token FROM tournaments WHERE id = ?', (tournament_id,)).fetchone()
+    conn.close()
+    if not row or not row['signup_token']:
+        flash('Signup link unavailable for this tournament.', 'error')
+        return redirect(url_for('tournaments'))
+    return redirect(url_for('tournament_signup_token', token=row['signup_token']))
+
+@app.route('/signup/<token>', methods=['GET', 'POST'])
+def tournament_signup_token(token):
+    """Public token-based signup page without site navigation."""
+    conn = get_db_connection()
+    tournament = conn.execute(
+        'SELECT * FROM tournaments WHERE signup_token = ?', (token,)
+    ).fetchone()
+
+    if tournament is None:
+        conn.close()
+        flash('Invalid or expired link.', 'error')
+        return redirect(url_for('tournaments'))
+
+    if request.method == 'POST':
+        if tournament['finalized']:
+            conn.close()
+            flash('Signups are closed for this tournament.', 'error')
+            return redirect(url_for('tournament_signup_token', token=token))
+
+        name = request.form.get('name', '').strip()
+        need_powercart = 1 if request.form.get('need_powercart') == 'on' else 0
+        notes = request.form.get('notes', '').strip()
+
+        if not name:
+            conn.close()
+            flash('Please enter your name.', 'error')
+            return redirect(url_for('tournament_signup_token', token=token))
+
+        created_at = datetime.utcnow().isoformat()
+        conn.execute(
+            'INSERT INTO tournament_signups (tournament_id, name, need_powercart, notes, created_at) VALUES (?, ?, ?, ?, ?)',
+            (tournament['id'], name, need_powercart, notes, created_at)
+        )
+        conn.commit()
+        conn.close()
+        flash('Thanks! Your signup was submitted.', 'success')
+        return redirect(url_for('tournament_signup_token', token=token))
+
+    signups = conn.execute(
+        'SELECT name, need_powercart, notes FROM tournament_signups WHERE tournament_id = ? ORDER BY id DESC',
+        (tournament['id'],)
+    ).fetchall()
+    conn.close()
+    return render_template('tournament_signup.html', tournament=tournament, signups=signups, hide_nav=True)
 
 @app.route('/tournament/<int:tournament_id>')
 def view_tournament(tournament_id):
@@ -891,6 +1038,13 @@ def view_tournament(tournament_id):
     if tournament is None:
         conn.close()
         return redirect(url_for('tournaments'))
+
+    # If finalized and a snapshot exists, return the stored HTML snapshot
+    if tournament['finalized']:
+        snapshot_html = get_tournament_snapshot_html(tournament_id)
+        if snapshot_html:
+            conn.close()
+            return snapshot_html
     
     # Get all groups for this tournament and their members
     groups_query = conn.execute(
@@ -1068,12 +1222,40 @@ def view_tournament(tournament_id):
         if len(calculated_net_scores) >= 2:
             automatic_awards['BB'] = calculated_net_scores[-2][0]['name']
     
+    # Load award prizes for this tournament before closing the connection
+    prize_rows = conn.execute(
+        'SELECT award_key, prize FROM tournament_award_prizes WHERE tournament_id = ?',
+        (tournament_id,)
+    ).fetchall()
+    award_prizes = {row['award_key']: row['prize'] for row in prize_rows}
     conn.close()
-    return render_template('view_tournament.html', tournament=tournament, gross_male_scores=gross_male_scores, gross_female_scores=gross_female_scores, net_male_scores=net_male_scores, net_female_scores=net_female_scores, members=members, groups=groups, selected_group_id=selected_group_id, adjustments_log=adjustments_log, honors_dict=honors_dict, honor_types=honor_types, automatic_awards=automatic_awards, honors_balls=honors_balls, total_balls_awarded=total_balls_awarded, male_balls_awarded=male_balls_awarded, female_balls_awarded=female_balls_awarded)
+
+    return render_template(
+        'view_tournament.html',
+        tournament=tournament,
+        gross_male_scores=gross_male_scores,
+        gross_female_scores=gross_female_scores,
+        net_male_scores=net_male_scores,
+        net_female_scores=net_female_scores,
+        members=members,
+        groups=groups,
+        selected_group_id=selected_group_id,
+        adjustments_log=adjustments_log,
+        honors_dict=honors_dict,
+        honor_types=honor_types,
+        automatic_awards=automatic_awards,
+        honors_balls=honors_balls,
+        total_balls_awarded=total_balls_awarded,
+        male_balls_awarded=male_balls_awarded,
+        female_balls_awarded=female_balls_awarded,
+        award_prizes=award_prizes
+    )
 
 @app.route('/tournament/<int:tournament_id>/add_score', methods=['POST'])
 def add_tournament_score(tournament_id):
     member_id = int(request.form['member_id'])
+    # Preserve selected group filter (if any) when redirecting back
+    selected_group_id = request.form.get('selected_group_id', type=int)
     
     # Get all hole scores
     hole_scores = []
@@ -1095,13 +1277,47 @@ def add_tournament_score(tournament_id):
             total_score, net_handicap
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', [tournament_id, member_id] + hole_scores + [total_score, member_handicap])
-    
-    # Increment tournaments_played for this member
-    conn.execute('UPDATE members SET tournaments_played = tournaments_played + 1 WHERE id = ?', (member_id,))
+
     conn.commit()
     conn.close()
     
     flash('Score added successfully.', 'success')
+    if selected_group_id:
+        return redirect(url_for('view_tournament', tournament_id=tournament_id, group_id=selected_group_id))
+    return redirect(url_for('view_tournament', tournament_id=tournament_id))
+
+@app.route('/tournament/<int:tournament_id>/set_award_prize', methods=['POST'])
+def set_award_prize(tournament_id):
+    award_key = request.form.get('award_key')
+    prize = request.form.get('prize', '').strip()
+    if not award_key:
+        flash('Missing award key.', 'danger')
+        return redirect(url_for('view_tournament', tournament_id=tournament_id))
+
+    conn = get_db_connection()
+    # Upsert prize for this tournament + award
+    conn.execute(
+        'INSERT INTO tournament_award_prizes (tournament_id, award_key, prize) VALUES (?, ?, ?)\n'
+        'ON CONFLICT(tournament_id, award_key) DO UPDATE SET prize=excluded.prize',
+        (tournament_id, award_key, prize)
+    )
+    conn.commit()
+    conn.close()
+
+    flash('Prize updated.', 'success')
+    return redirect(url_for('view_tournament', tournament_id=tournament_id))
+
+@app.route('/tournament/<int:tournament_id>/clear_award_prize', methods=['POST'])
+def clear_award_prize(tournament_id):
+    award_key = request.form.get('award_key')
+    if not award_key:
+        flash('Missing award key.', 'danger')
+        return redirect(url_for('view_tournament', tournament_id=tournament_id))
+    conn = get_db_connection()
+    conn.execute('DELETE FROM tournament_award_prizes WHERE tournament_id = ? AND award_key = ?', (tournament_id, award_key))
+    conn.commit()
+    conn.close()
+    flash('Prize cleared.', 'success')
     return redirect(url_for('view_tournament', tournament_id=tournament_id))
 
 @app.route('/edit_member/<int:member_id>', methods=['GET', 'POST'])
@@ -1274,6 +1490,16 @@ def finalize_tournament(tournament_id):
         'UPDATE tournaments SET finalized = 1 WHERE id = ?',
         (tournament_id,)
     )
+
+    # Increment tournaments_played for all members who have a score in this tournament
+    participant_rows = conn.execute(
+        'SELECT DISTINCT member_id FROM tournament_scores WHERE tournament_id = ?',
+        (tournament_id,)
+    ).fetchall()
+    participant_ids = [row['member_id'] for row in participant_rows]
+    for pid in participant_ids:
+        conn.execute('UPDATE members SET tournaments_played = tournaments_played + 1 WHERE id = ?', (pid,))
+
     conn.commit()
     conn.close()
     
@@ -1281,6 +1507,13 @@ def finalize_tournament(tournament_id):
     # Apply handicap adjustments
     apply_handicap_adjustments(tournament_id)
     print("Handicap adjustments completed")
+
+    # After adjustments, render and save a snapshot of the tournament page
+    try:
+        save_tournament_snapshot(tournament_id)
+        print("Saved tournament snapshot")
+    except Exception as e:
+        print(f"Failed to save tournament snapshot: {e}")
     
     # Redirect to the view_tournament page
     flash('Tournament finalized and handicaps adjusted.', 'success')
@@ -1297,6 +1530,28 @@ def delete_tournament(tournament_id):
     conn.close()
     flash('Tournament deleted.', 'success')
     return redirect(url_for('tournaments'))
+
+@app.route('/admin/recalculate_tournaments_played', methods=['GET'])
+def recalculate_tournaments_played():
+    """Recalculate tournaments_played for all members based only on finalized tournaments."""
+    conn = get_db_connection()
+    try:
+        conn.execute('''
+            UPDATE members
+            SET tournaments_played = (
+                SELECT COUNT(DISTINCT ts.tournament_id)
+                FROM tournament_scores ts
+                JOIN tournaments t ON t.id = ts.tournament_id
+                WHERE ts.member_id = members.id AND t.finalized = 1
+            )
+        ''')
+        conn.commit()
+        flash('Recalculated tournaments played from finalized tournaments.', 'success')
+    except sqlite3.Error as e:
+        flash(f'Error recalculating: {e}', 'error')
+    finally:
+        conn.close()
+    return redirect(url_for('members'))
 
 @app.route('/edit_score/<int:score_id>', methods=['GET', 'POST'])
 def edit_score(score_id):
@@ -1477,7 +1732,7 @@ def view_group(group_id):
     
     # Get group info with tournament details
     group = conn.execute('''
-        SELECT g.*, t.name as tournament_name, t.id as tournament_id
+        SELECT g.*, t.name as tournament_name, t.id as tournament_id, t.finalized AS tournament_finalized
         FROM groups g
         JOIN tournaments t ON g.tournament_id = t.id
         WHERE g.id = ?
@@ -1710,9 +1965,7 @@ def add_group_score(group_id):
             total_score, net_handicap
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', [tournament_id, member_id] + hole_scores + [total_score, member_handicap])
-    
-    # Increment tournaments_played for this member
-    conn.execute('UPDATE members SET tournaments_played = tournaments_played + 1 WHERE id = ?', (member_id,))
+
     conn.commit()
     conn.close()
     
@@ -2054,9 +2307,7 @@ def secure_add_group_score(token):
             total_score, net_handicap
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', [tournament_id, member_id] + hole_scores + [total_score, member_handicap])
-    
-    # Increment tournaments_played for this member
-    conn.execute('UPDATE members SET tournaments_played = tournaments_played + 1 WHERE id = ?', (member_id,))
+
     conn.commit()
     conn.close()
     
